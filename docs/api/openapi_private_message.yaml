@@ -1,15 +1,29 @@
 openapi: 3.0.0
 info:
-  title: Взаимодействие микросервисов с сервисом сообщений
+  title: Взаимодействие с сервисом сообщений
   description: Внутренние запросы к сервису сообщений
   version: 1.0.0
 
 tags:
-  - name: Отправка сообщения
+  - name: "Отправка сообщения"
+  - name: "Валидация сессии"
 
 paths:
   /message:
     post:
+      tags:
+        - "Отправка сообщения"
       responses:
         '201': 
           description: "Сообщение отправлено."
+  /sessions/validate:
+    post:
+      summary: "Валидация сессии."
+      description: "Валидация сессии."
+      tags:
+        - "Валидация сессии"
+      responses:
+        '200':
+          description: "Сессия валидна."
+        '401':
+          description: "Сессия невалидна."
