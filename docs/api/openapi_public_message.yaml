@@ -1,0 +1,138 @@
+openapi: 3.0.0
+info:
+  title: Взаимодействие клиента с сервисом сообщений
+  description: Клиентские запросы к сервису сообщений
+  version: 1.0.0
+
+tags:
+  - name: Авторизация
+  - name: "Профиль пользователя"
+
+paths:
+  /users:
+    post:
+      tags:
+        - Авторизация
+      summary: Создать пользователя.
+      description: Создать пользователя.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCreate'
+      responses:
+        '201':
+          description: Пользователь создан.
+        '500':
+          description: Внутренняя ошибка сервера.
+  /sessions:
+    post:
+      tags:
+        - Авторизация
+      summary: Создать сессию.
+      description: Создать сессию.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SessionCreate'
+      responses:
+        '201':
+          description: Сессия создана.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionCredentials'
+        '401':
+          description: Данные для входа некорректны.
+  /sessions/refresh:
+    post:
+      tags:
+        - Авторизация
+      summary: "Обновление токена."
+      description: "Обновление токена."
+      responses:
+        '201':
+          description: "Выдан новый токен."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionCredentials"
+  /sessions/{id}:
+    delete:
+      tags:
+        - Авторизация
+      summary: Инвалидировать сессию.
+      description: Инвалидировать сессию.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Сессия инвалидирована
+  /profile:
+    patch:
+      tags:
+        - "Профиль пользователя"
+      summary: "Изменение настроек профиля пользователя."
+      description: "Изменение настроек профиля пользователя."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProfileEdit"
+      responses:
+        '200':
+          description: "Настройки успешно изменены."
+      
+
+components:
+  schemas:
+    UserCreate:
+      type: object
+      properties:
+        login:
+          type: string
+        password:
+          type: string
+      required:
+        - username
+        - password
+
+    SessionCredentials:
+      type: object
+      properties:
+        token:
+          type: string
+        refreshToken:
+          type: string
+        sessionId:
+          type: string
+      required:
+        - token
+        - refreshToken
+
+    SessionCreate:
+      type: object
+      properties:
+        login:
+          type: string
+        password:
+          type: string
+      required:
+        - name
+        - email
+    
+    ProfileEdit:
+      type: object
+      properties:
+        visibleName:
+          type: string
+        username:
+          type: string

@@ -1,3 +1,3 @@
-module messenger
+module quaztz
 
 go 1.26.1
