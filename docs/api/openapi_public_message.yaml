@@ -1,12 +1,18 @@
 openapi: 3.0.0
 info:
-  title: Взаимодействие клиента с сервисом сообщений
-  description: Клиентские запросы к сервису сообщений
+  title: Взаимодействие клиента с сервисом мессенджера
+  description: Клиентские запросы к сервису мессенджера
   version: 1.0.0
 
 tags:
   - name: Авторизация
   - name: "Профиль пользователя"
+  - name: "Чаты"
+  - name: "Участники чатов"
+  - name: "Сообщения"
+
+security:
+  - bearerAuth: []
 
 paths:
   /users:
@@ -15,6 +21,7 @@ paths:
         - Авторизация
       summary: Создать пользователя.
       description: Создать пользователя.
+      security: []
       requestBody:
         required: true
         content:
@@ -32,6 +39,7 @@ paths:
         - Авторизация
       summary: Создать сессию.
       description: Создать сессию.
+      security: []
       requestBody:
         required: true
         content:
@@ -47,12 +55,13 @@ paths:
                 $ref: "#/components/schemas/SessionCredentials"
         "401":
           description: Данные для входа некорректны.
-  /sessions/refresh:
+  /tokens:
     post:
       tags:
         - Авторизация
       summary: "Обновление токена."
       description: "Обновление токена."
+      security: []
       requestBody:
         required: true
         content:
@@ -60,7 +69,7 @@ paths:
             schema:
               $ref: "#/components/schemas/SessionRefresh"
       responses:
-        "201":
+        "200":
           description: "Выдан новый токен."
           content:
             application/json:
@@ -96,9 +105,145 @@ paths:
       responses:
         "200":
           description: "Настройки успешно изменены."
-      
+  /chats:
+    get:
+      tags:
+        - "Чаты"
+      summary: "Список чатов пользователя."
+      description: "Список чатов пользователя."
+      responses:
+        "200":
+          description: "Список чатов."
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Chat"
+    post:
+      tags:
+        - "Чаты"
+      summary: "Создать чат."
+      description: "Создать чат."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatCreate"
+      responses:
+        "201":
+          description: "Чат создан."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Chat"
+  /chats/{id}/messages:
+    get:
+      tags:
+        - "Сообщения"
+      summary: "История сообщений чата."
+      description: "История сообщений чата."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: before
+          in: query
+          schema:
+            type: integer
+            format: int64
+        - name: after
+          in: query
+          schema:
+            type: integer
+            format: int64
+        - name: limit
+          in: query
+          schema:
+            type: integer
+        - name: q
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "Сообщения чата."
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Message"
+  /chats/{id}/members:
+    get:
+      tags:
+        - "Участники чатов"
+      summary: "Участники чата."
+      description: "Участники чата."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "Участники чата."
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Member"
+    post:
+      tags:
+        - "Участники чатов"
+      summary: "Добавить участника."
+      description: "Добавить участника."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MemberAdd"
+      responses:
+        "201":
+          description: "Участник добавлен."
+  /chats/{id}/members/{userId}:
+    delete:
+      tags:
+        - "Участники чатов"
+      summary: "Удалить участника."
+      description: "Удалить участника."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: "Участник удален."
 
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
   schemas:
     UserCreate:
       type: object
@@ -123,6 +268,7 @@ components:
       required:
         - token
         - refreshToken
+        - sessionId
 
     SessionCreate:
       type: object
@@ -150,3 +296,69 @@ components:
           type: string
         username:
           type: string
+
+    Chat:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        title:
+          type: string
+      required:
+        - id
+        - type
+
+    ChatCreate:
+      type: object
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        memberIds:
+          type: array
+          items:
+            type: string
+      required:
+        - type
+        - memberIds
+
+    Message:
+      type: object
+      properties:
+        seqnum:
+          type: integer
+          format: int64
+        senderId:
+          type: string
+        content:
+          type: string
+        sentAt:
+          type: string
+          format: "date-time"
+      required:
+        - seqnum
+        - senderId
+        - content
+        - sentAt
+
+    Member:
+      type: object
+      properties:
+        userId:
+          type: string
+        role:
+          type: string
+      required:
+        - userId
+        - role
+
+    MemberAdd:
+      type: object
+      properties:
+        userId:
+          type: string
+      required:
+        - userId

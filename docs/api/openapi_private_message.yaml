@@ -1,15 +1,18 @@
 openapi: 3.0.0
 info:
-  title: Взаимодействие с сервисом сообщений
-  description: Внутренние запросы к сервису сообщений
+  title: Взаимодействие с сервисом мессенджера
+  description: Внутренние запросы к сервису мессенджера
   version: 1.0.0
 
 tags:
   - name: "Отправка сообщения"
   - name: "Валидация сессии"
 
+security:
+  - internalAuth: []
+
 paths:
-  /message:
+  /messages:
     post:
       tags:
         - "Отправка сообщения"
@@ -24,6 +27,10 @@ paths:
       responses:
         "201": 
           description: "Сообщение отправлено."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SentMessageResponse"
         "400":
           description: "Некорректный запрос."
   /sessions/validate:
@@ -33,6 +40,7 @@ paths:
       summary: "Валидация сессии."
       description: "Валидация сессии."
       requestBody:
+        required: true
         content:
           application/json:
             schema:
@@ -40,30 +48,46 @@ paths:
       responses:
         "200":
           description: "Сессия валидна."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidateResponse"
         "401":
           description: "Сессия невалидна."
 
 components:
+  securitySchemes:
+    internalAuth:
+      type: http
+      scheme: bearer
   schemas:
     SentMessage:
       type: object
       properties:
         content:
           type: string
+        clientMessageId:
+          type: string
         chatId:
           type: string
         senderId:
           type: string
-        recepientId:
-          type: string
+      required:
+        - content
+        - clientMessageId
+        - chatId
+        - senderId
+    SentMessageResponse:
+      type: object
+      properties:
+        seqnum:
+          type: integer
+          format: int64
         sentAt:
           type: string
           format: "date-time"
       required:
-        - content
-        - chatId
-        - senderId
-        - recepientId
+        - seqnum
         - sentAt
     TokenValidate:
       type: object
@@ -72,3 +96,14 @@ components:
           type: string
       required:
         - token
+    ValidateResponse:
+      type: object
+      properties:
+        userId:
+          type: string
+        expiresAt:
+          type: string
+          format: "date-time"
+      required:
+        - userId
+        - expiresAt

@@ -6,14 +6,18 @@ info:
 
 tags:
   - name: "Передача сообщений"
+  - name: "Управление соединениями"
+
+security:
+  - internalAuth: []
 
 paths:
   /deliver:
     post:
       tags:
         - "Передача сообщений"
-      summary: "Пересылка сообщения указанному пользователю."
-      description: "Пересылка сообщения указанному пользователю."
+      summary: "Доставка сообщения указанному пользователю."
+      description: "Доставка сообщения указанному пользователю."
       requestBody:
         required: true
         content:
@@ -25,8 +29,27 @@ paths:
           description: "Сообщение передано в доставку."
         "400":
           description: "Некорректный запрос."
+  /connections/{sessionId}:
+    delete:
+      tags:
+        - "Управление соединениями"
+      summary: "Разрыв соединений указанной сессии."
+      description: "Разрыв соединений указанной сессии."
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: "Соединение разорвано или отсутствует."
 
 components:
+  securitySchemes:
+    internalAuth:
+      type: http
+      scheme: bearer
   schemas:
     ReceivedMessage:
       type: object
@@ -37,8 +60,11 @@ components:
           type: string
         senderId:
           type: string
-        recepientId:
+        recipientId:
           type: string
+        seqnum:
+          type: integer
+          format: int64
         sentAt:
           type: string
           format: "date-time"
@@ -46,5 +72,6 @@ components:
         - content
         - chatId
         - senderId
-        - recepientId
+        - recipientId
+        - seqnum
         - sentAt
