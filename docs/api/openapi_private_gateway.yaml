@@ -1,0 +1,50 @@
+openapi: 3.0.0
+info:
+  title: Взаимодействие с шлюзом соединений
+  description: Внутренние запросы к шлюзу соединений
+  version: 1.0.0
+
+tags:
+  - name: "Передача сообщений"
+
+paths:
+  /deliver:
+    post:
+      tags:
+        - "Передача сообщений"
+      summary: "Пересылка сообщения указанному пользователю."
+      description: "Пересылка сообщения указанному пользователю."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReceivedMessage"
+      responses:
+        "202":
+          description: "Сообщение передано в доставку."
+        "400":
+          description: "Некорректный запрос."
+
+components:
+  schemas:
+    ReceivedMessage:
+      type: object
+      properties:
+        content:
+          type: string
+        chatId:
+          type: string
+        senderId:
+          type: string
+        recepientId:
+          type: string
+        sentAt:
+          type: string
+          format: "date-time"
+      required:
+        - content
+        - chatId
+        - senderId
+        - recepientId
+        - sentAt

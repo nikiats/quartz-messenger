@@ -13,17 +13,62 @@ paths:
     post:
       tags:
         - "Отправка сообщения"
+      summary: "Отправка сообщения."
+      description: "Отправка сообщения."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SentMessage"
       responses:
-        '201': 
+        "201": 
           description: "Сообщение отправлено."
+        "400":
+          description: "Некорректный запрос."
   /sessions/validate:
     post:
-      summary: "Валидация сессии."
-      description: "Валидация сессии."
       tags:
         - "Валидация сессии"
+      summary: "Валидация сессии."
+      description: "Валидация сессии."
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TokenValidate"
       responses:
-        '200':
+        "200":
           description: "Сессия валидна."
-        '401':
+        "401":
           description: "Сессия невалидна."
+
+components:
+  schemas:
+    SentMessage:
+      type: object
+      properties:
+        content:
+          type: string
+        chatId:
+          type: string
+        senderId:
+          type: string
+        recepientId:
+          type: string
+        sentAt:
+          type: string
+          format: "date-time"
+      required:
+        - content
+        - chatId
+        - senderId
+        - recepientId
+        - sentAt
+    TokenValidate:
+      type: object
+      properties:
+        token:
+          type: string
+      required:
+        - token
