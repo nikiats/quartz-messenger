@@ -35,7 +35,7 @@ components:
   messages:
     Ping:
       name: ping
-      description: Уведомление об активности соединения.
+      description: Уведомление об активности соединения. Должно отправляться для того, чтобы сервер получал каждые 10 секунд минимум по одному сообщению. В противном случае соединение принудительно закрывается.
       tags:
         - name: "Служебные"
       payload:
@@ -43,7 +43,7 @@ components:
 
     Pong:
       name: pong
-      description: Ответ на проверку соединения.
+      description: Ответ на проверку соединения. Позволяет пользователю понять, что сервер достижим.
       tags:
         - name: "Служебные"
       payload:
@@ -51,7 +51,7 @@ components:
 
     Authorize:
       name: authorize
-      description: Авторизация пользователя по токену.
+      description: Авторизация пользователя по токену. Данное сообщение обязано быть первым сообщением от пользователя серверу. В противном случае соединение принудительно закрывается.
       tags:
         - name: "Авторизация"
       payload:
@@ -59,7 +59,7 @@ components:
 
     AuthorizeResponse:
       name: authorizeResponse
-      description: Результат авторизации.
+      description: "Результат авторизации. В случае success: false соединение будет разорвано сервером."
       tags:
         - name: "Авторизация"
       payload:
@@ -67,7 +67,7 @@ components:
 
     RequireAuthorize:
       name: requireAuthorize
-      description: "Запрос клиента повторно авторизоваться."
+      description: "Указание клиенту повторно авторизоваться. Возникает при приближении к моменту истечения токена. По истечении 5 секунд без авторизации соединение принудительно закрывается сервером."
       tags:
         - name: "Авторизация"
       payload:
@@ -83,7 +83,7 @@ components:
 
     SendMessageResponse:
       name: sendMessageResponse
-      description: Результат отправки сообщения.
+      description: Результат отправки сообщения. Сообщение об ошибке считать в данной реализации произвольным.
       tags:
         - name: "Сообщения"
       payload:
@@ -219,10 +219,11 @@ components:
     Message:
       type: object
       description: Входящее сообщение.
-      required: [content]
+      required: [content, sentAt]
       properties:
         content:
           type: string
+          minLength: 1
           description: Текст сообщения.
         sentAt:
           type: string
@@ -236,4 +237,6 @@ components:
       properties:
         content:
           type: string
-          description: Текст сообщения.
+          minLength: 1
+          maxLength: 100
+          description: Текст сообщения. Максимальная длина составляет.

@@ -55,27 +55,27 @@ components:
     ReceivedMessage:
       type: object
       properties:
-        content:
-          type: string
         chatId:
           type: string
           format: uuid
+        seqnum:
+          type: integer
+          format: int64
         senderId:
           type: string
           format: uuid
         recipientId:
           type: string
           format: uuid
-        seqnum:
-          type: integer
-          format: int64
+        content:
+          type: string
         sentAt:
           type: string
           format: "date-time"
       required:
-        - content
         - chatId
+        - seqnum
+        - content
         - senderId
         - recipientId
-        - seqnum
         - sentAt

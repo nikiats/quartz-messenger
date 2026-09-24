@@ -87,6 +87,7 @@ paths:
           required: true
           schema:
             type: string
+            format: uuid
       responses:
         "204":
           description: Сессия инвалидирована
@@ -153,6 +154,7 @@ paths:
           required: true
           schema:
             type: string
+            format: uuid
         - name: before
           in: query
           schema:
@@ -200,6 +202,7 @@ paths:
           required: true
           schema:
             type: string
+            format: uuid
       responses:
         "200":
           description: "Участники чата."
@@ -220,6 +223,7 @@ paths:
           required: true
           schema:
             type: string
+            format: uuid
       requestBody:
         required: true
         content:
@@ -241,6 +245,7 @@ paths:
           required: true
           schema:
             type: string
+            format: uuid
         - name: userId
           in: path
           required: true
@@ -315,6 +320,7 @@ components:
       properties:
         id:
           type: string
+          format: uuid
         type:
           type: string
         title:
@@ -345,6 +351,9 @@ components:
     Message:
       type: object
       properties:
+        chatId:
+          type: string
+          format: uuid
         seqnum:
           type: integer
           format: int64

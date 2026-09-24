@@ -66,6 +66,8 @@ components:
       properties:
         content:
           type: string
+          minLength: 1
+          maxLength: 100
         clientMessageId:
           type: string
           format: uuid
@@ -83,6 +85,9 @@ components:
     SentMessageResponse:
       type: object
       properties:
+        chatId:
+          type: string
+          format: uuid
         seqnum:
           type: integer
           format: int64
@@ -90,6 +95,7 @@ components:
           type: string
           format: "date-time"
       required:
+        - chatId
         - seqnum
         - sentAt
     TokenValidate:
@@ -107,9 +113,11 @@ components:
           format: uuid
         sessionId:
           type: string
+          format: uuid
         expiresAt:
           type: string
           format: "date-time"
       required:
         - userId
         - expiresAt
+        - sessionId
