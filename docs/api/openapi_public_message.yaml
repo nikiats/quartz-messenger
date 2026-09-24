@@ -75,6 +75,10 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SessionCredentials"
+        "400":
+          description: "Некорректный запрос."
+        "401":
+          description: "Токен некорректен."
   /sessions/{id}:
     delete:
       tags:
@@ -190,6 +194,39 @@ paths:
                     type: array
                     items:
                       $ref: "#/components/schemas/Message"
+        "403":
+          description: "Нет прав."
+    post:
+      tags:
+        - "Сообщения"
+      summary: "Отправка сообщения."
+      description: "Отправка сообщения.
+        > Повторная отправка с тем же clientMessageId не создает новое сообщение,
+        > а возвращает ранее сохраненное."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendMessage"
+      responses:
+        "201":
+          description: "Сообщение отправлено."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+        "403":
+          description: "Нет прав."
+        "400":
+          description: "Некорректный запрос."
   /chats/{id}/members:
     get:
       tags:
@@ -212,6 +249,8 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Member"
+        "403":
+          description: "Недостаточно прав."
     post:
       tags:
         - "Участники чатов"
@@ -233,6 +272,8 @@ paths:
       responses:
         "201":
           description: "Участник добавлен."
+        "403":
+          description: "Недостаточно прав."
   /chats/{id}/members/{userId}:
     delete:
       tags:
@@ -255,6 +296,8 @@ paths:
       responses:
         "204":
           description: "Участник удален."
+        "400":
+          description: "Некорректный запрос."
 
 components:
   securitySchemes:
@@ -323,11 +366,18 @@ components:
           format: uuid
         type:
           type: string
+          enum:
+            - private
+            - group
         title:
           type: string
+        lastMessageAt:
+          type: string
+          format: "date-time"
       required:
         - id
         - type
+        - lastMessageAt
 
     ChatCreate:
       type: object
@@ -370,6 +420,18 @@ components:
         - senderId
         - content
         - sentAt
+
+    SendMessage:
+      type: object
+      properties:
+        clientMessageId:
+          type: string
+          format: uuid
+        content:
+          type: string
+      required:
+        - clientMessageId
+        - content
 
     Member:
       type: object

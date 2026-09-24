@@ -23,7 +23,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/SentMessage"
+              $ref: "#/components/schemas/SendingMessage"
       responses:
         "201": 
           description: "Сообщение отправлено."
@@ -61,7 +61,7 @@ components:
       type: http
       scheme: bearer
   schemas:
-    SentMessage:
+    SendingMessage:
       type: object
       properties:
         content:

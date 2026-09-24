@@ -8,14 +8,14 @@ sequenceDiagram
     participant C as Клиент
     participant G as Шлюз соединений
     participant M as Сервис мессенджера
-    participant R as Redis
+    participant P as PostgreSQL
 
     C->>G: WebSocket handshake
     G-->>C: соединение открыто
     C->>G: token
     G->>M: POST /sessions/validate
-    M->>R: запрос сессии
-    R-->>M: состояние сессии
+    M->>P: запрос сессии
+    P-->>M: состояние сессии
     alt сессия валидна
         M-->>G: 200
         G-->>C: соединение аутентифицировано
