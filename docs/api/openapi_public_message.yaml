@@ -143,7 +143,10 @@ paths:
       tags:
         - "Сообщения"
       summary: "История сообщений чата."
-      description: "История сообщений чата."
+      description: "История сообщений чата.
+        > Параметры before и after нельзя использовать одновременно.
+        > Сообщения отсортированы в порядке от точки загрузки - before/after в направлении незагруженных сообщений.
+        > Результат поиска отсортирован от новых сообщений к старым."
       parameters:
         - name: id
           in: path
@@ -163,6 +166,9 @@ paths:
         - name: limit
           in: query
           schema:
+            minimum: 1
+            maximum: 100
+            default: 10
             type: integer
         - name: q
           in: query
@@ -174,9 +180,14 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Message"
+                type: object
+                properties:
+                  hasMore:
+                    type: boolean
+                  messages:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Message"
   /chats/{id}/members:
     get:
       tags:
@@ -235,6 +246,7 @@ paths:
           required: true
           schema:
             type: string
+            format: uuid
       responses:
         "204":
           description: "Участник удален."
@@ -265,6 +277,7 @@ components:
           type: string
         sessionId:
           type: string
+          format: uuid
       required:
         - token
         - refreshToken
@@ -315,12 +328,16 @@ components:
       properties:
         type:
           type: string
+          enum:
+            - private
+            - group
         title:
           type: string
         memberIds:
           type: array
           items:
             type: string
+            format: uuid
       required:
         - type
         - memberIds
@@ -333,6 +350,7 @@ components:
           format: int64
         senderId:
           type: string
+          format: uuid
         content:
           type: string
         sentAt:
@@ -349,8 +367,12 @@ components:
       properties:
         userId:
           type: string
+          format: uuid
         role:
           type: string
+          enum:
+            - regular
+            - admin
       required:
         - userId
         - role
@@ -360,5 +382,6 @@ components:
       properties:
         userId:
           type: string
+          format: uuid
       required:
         - userId

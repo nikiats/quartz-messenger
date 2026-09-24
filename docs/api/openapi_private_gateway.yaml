@@ -17,7 +17,7 @@ paths:
       tags:
         - "Передача сообщений"
       summary: "Доставка сообщения указанному пользователю."
-      description: "Доставка сообщения указанному пользователю."
+      description: "Доставка сообщения указанному пользователю. Независимо от успешности доставки возвращает код 202."
       requestBody:
         required: true
         content:
@@ -41,6 +41,7 @@ paths:
           required: true
           schema:
             type: string
+            format: uuid
       responses:
         "204":
           description: "Соединение разорвано или отсутствует."
@@ -58,10 +59,13 @@ components:
           type: string
         chatId:
           type: string
+          format: uuid
         senderId:
           type: string
+          format: uuid
         recipientId:
           type: string
+          format: uuid
         seqnum:
           type: integer
           format: int64

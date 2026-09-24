@@ -1,0 +1,142 @@
+asyncapi: 2.6.0
+info:
+  title: WebSocket шлюз
+  version: 1.0.0
+  description: Взаимодействие клиента с шлюзом соединений мессенджера.
+channels:
+  /ws:
+    description: WebSocket путь в шлюзе соединений.
+    publish:
+      operationId: sendFromUser
+      description: Сообщения от клиента к серверу.
+      message:
+        oneOf:
+          - $ref: '#/components/messages/Ping'
+          - $ref: '#/components/messages/Authorize'
+          - $ref: '#/components/messages/SendMessage'
+    subscribe:
+      operationId: receiveFromServer
+      description: Сообщения от сервера к клиенту.
+      message:
+        oneOf:
+          - $ref: '#/components/messages/Pong'
+          - $ref: '#/components/messages/AuthorizeResponse'
+          - $ref: '#/components/messages/SendMessageResponse'
+          - $ref: '#/components/messages/ReceiveMessage'
+components:
+  messages:
+    Ping:
+      name: ping
+      description: Уведомление об активности соединения.
+      payload:
+        type: object
+        required: [method]
+        properties:
+          method:
+            type: string
+            const: ping
+            description: Метод сообщения.
+    Authorize:
+      name: authorize
+      description: Авторизация пользователя по токену.
+      payload:
+        type: object
+        required: [method, token]
+        properties:
+          method:
+            type: string
+            const: authorize
+            description: Метод сообщения.
+          token:
+            type: string
+            description: Токен авторизации.
+    SendMessage:
+      name: sendMessage
+      description: Отправка сообщения.
+      payload:
+        type: object
+        required: [method, chatId, content, clientMessageID]
+        properties:
+          method:
+            type: string
+            const: sendMessage
+            description: Метод сообщения.
+          chatId:
+            type: string
+            format: uuid
+            description: Идентификатор чата.
+          content:
+            type: string
+            description: Текст сообщения.
+          clientMessageID:
+            type: string
+            format: uuid
+            description: Клиентский идентификатор сообщения, сгенерированный на клиенте случайным образом.
+    Pong:
+      name: pong
+      description: Ответ на проверку соединения.
+      payload:
+        type: object
+        required: [method]
+        properties:
+          method:
+            type: string
+            const: pong
+            description: Метод сообщения.
+    AuthorizeResponse:
+      name: authorizeResponse
+      description: Результат авторизации.
+      payload:
+        type: object
+        required: [method, success]
+        properties:
+          method:
+            type: string
+            const: authorizeResponse
+            description: Метод сообщения.
+          success:
+            type: boolean
+            description: "Успешность авторизации."
+    SendMessageResponse:
+      name: sendMessageResponse
+      description: Подтверждение отправки сообщения.
+      payload:
+        type: object
+        required: [method, clientMessageId, seqnum]
+        properties:
+          method:
+            type: string
+            const: sendMessageResponse
+            description: Метод сообщения.
+          clientMessageId:
+            type: string
+            format: uuid
+            description: Клиентский идентификатор сообщения.
+          seqnum:
+            type: integer
+            description: Порядковый номер сообщения.
+    ReceiveMessage:
+      name: receiveMessage
+      description: Входящее сообщение из чата.
+      payload:
+        type: object
+        required: [method, chatId, senderId, content, seqnum]
+        properties:
+          method:
+            type: string
+            const: receiveMessage
+            description: Метод сообщения.
+          chatId:
+            type: string
+            format: uuid
+            description: Идентификатор чата.
+          senderId:
+            type: string
+            format: uuid
+            description: Идентификатор отправителя.
+          content:
+            type: string
+            description: Текст сообщения.
+          seqnum:
+            type: integer
+            description: Порядковый номер сообщения.

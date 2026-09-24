@@ -68,10 +68,13 @@ components:
           type: string
         clientMessageId:
           type: string
+          format: uuid
         chatId:
           type: string
+          format: uuid
         senderId:
           type: string
+          format: uuid
       required:
         - content
         - clientMessageId
@@ -100,6 +103,9 @@ components:
       type: object
       properties:
         userId:
+          type: string
+          format: uuid
+        sessionId:
           type: string
         expiresAt:
           type: string
