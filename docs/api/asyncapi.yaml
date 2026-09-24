@@ -3,6 +3,12 @@ info:
   title: WebSocket шлюз
   version: 1.0.0
   description: Взаимодействие клиента с шлюзом соединений мессенджера.
+
+tags:
+  - name: "Служебные"
+  - name: "Авторизация"
+  - name: "Сообщения"
+
 channels:
   /ws:
     description: WebSocket путь в шлюзе соединений.
@@ -23,120 +29,211 @@ channels:
           - $ref: '#/components/messages/AuthorizeResponse'
           - $ref: '#/components/messages/SendMessageResponse'
           - $ref: '#/components/messages/ReceiveMessage'
+          - $ref: '#/components/messages/RequireAuthorize'
+
 components:
   messages:
     Ping:
       name: ping
       description: Уведомление об активности соединения.
+      tags:
+        - name: "Служебные"
       payload:
-        type: object
-        required: [method]
-        properties:
-          method:
-            type: string
-            const: ping
-            description: Метод сообщения.
-    Authorize:
-      name: authorize
-      description: Авторизация пользователя по токену.
-      payload:
-        type: object
-        required: [method, token]
-        properties:
-          method:
-            type: string
-            const: authorize
-            description: Метод сообщения.
-          token:
-            type: string
-            description: Токен авторизации.
-    SendMessage:
-      name: sendMessage
-      description: Отправка сообщения.
-      payload:
-        type: object
-        required: [method, chatId, content, clientMessageID]
-        properties:
-          method:
-            type: string
-            const: sendMessage
-            description: Метод сообщения.
-          chatId:
-            type: string
-            format: uuid
-            description: Идентификатор чата.
-          content:
-            type: string
-            description: Текст сообщения.
-          clientMessageID:
-            type: string
-            format: uuid
-            description: Клиентский идентификатор сообщения, сгенерированный на клиенте случайным образом.
+        $ref: "#/components/schemas/PingPayload"
+
     Pong:
       name: pong
       description: Ответ на проверку соединения.
+      tags:
+        - name: "Служебные"
       payload:
-        type: object
-        required: [method]
-        properties:
-          method:
-            type: string
-            const: pong
-            description: Метод сообщения.
+        $ref: "#/components/schemas/PongPayload"
+
+    Authorize:
+      name: authorize
+      description: Авторизация пользователя по токену.
+      tags:
+        - name: "Авторизация"
+      payload:
+        $ref: "#/components/schemas/AuthorizePayload"
+
     AuthorizeResponse:
       name: authorizeResponse
       description: Результат авторизации.
+      tags:
+        - name: "Авторизация"
       payload:
-        type: object
-        required: [method, success]
-        properties:
-          method:
-            type: string
-            const: authorizeResponse
-            description: Метод сообщения.
-          success:
-            type: boolean
-            description: "Успешность авторизации."
+        $ref: "#/components/schemas/AuthorizeResponsePayload"
+
+    RequireAuthorize:
+      name: requireAuthorize
+      description: "Запрос клиента повторно авторизоваться."
+      tags:
+        - name: "Авторизация"
+      payload:
+        $ref: "#/components/schemas/RequireAuthorizePayload"
+
+    SendMessage:
+      name: sendMessage
+      description: Отправка сообщения.
+      tags:
+        - name: "Сообщения"
+      payload:
+        $ref: "#/components/schemas/SendMessagePayload"
+
     SendMessageResponse:
       name: sendMessageResponse
-      description: Подтверждение отправки сообщения.
+      description: Результат отправки сообщения.
+      tags:
+        - name: "Сообщения"
       payload:
-        type: object
-        required: [method, clientMessageId, seqnum]
-        properties:
-          method:
-            type: string
-            const: sendMessageResponse
-            description: Метод сообщения.
-          clientMessageId:
-            type: string
-            format: uuid
-            description: Клиентский идентификатор сообщения.
-          seqnum:
-            type: integer
-            description: Порядковый номер сообщения.
+        $ref: "#/components/schemas/SendMessageResponsePayload"
+
     ReceiveMessage:
       name: receiveMessage
-      description: Входящее сообщение из чата.
+      description: Доставка входящего сообщения.
+      tags:
+        - name: "Сообщения"
       payload:
-        type: object
-        required: [method, chatId, senderId, content, seqnum]
-        properties:
-          method:
-            type: string
-            const: receiveMessage
-            description: Метод сообщения.
-          chatId:
-            type: string
-            format: uuid
-            description: Идентификатор чата.
-          senderId:
-            type: string
-            format: uuid
-            description: Идентификатор отправителя.
-          content:
-            type: string
-            description: Текст сообщения.
-          seqnum:
-            type: integer
-            description: Порядковый номер сообщения.
+        $ref: "#/components/schemas/ReceiveMessagePayload"
+
+  schemas:
+    PingPayload:
+      type: object
+      required: [method]
+      properties:
+        method:
+          type: string
+          const: ping
+          description: Метод сообщения.
+
+    PongPayload:
+      type: object
+      required: [method]
+      properties:
+        method:
+          type: string
+          const: pong
+          description: Метод сообщения.
+
+    AuthorizePayload:
+      type: object
+      required: [method, token]
+      properties:
+        method:
+          type: string
+          const: authorize
+          description: Метод сообщения.
+        token:
+          type: string
+          description: Токен авторизации.
+
+    AuthorizeResponsePayload:
+      type: object
+      required: [method, success]
+      properties:
+        method:
+          type: string
+          const: authorizeResponse
+          description: Метод сообщения.
+        success:
+          type: boolean
+          description: "Успешность авторизации."
+
+    RequireAuthorizePayload:
+      type: object
+      required: [method]
+      properties:
+        method:
+          type: string
+          const: requireAuthorize
+          description: Метод сообщения.
+
+    SendMessagePayload:
+      type: object
+      required: [method, chatId, message, clientMessageId]
+      properties:
+        method:
+          type: string
+          const: sendMessage
+          description: Метод сообщения.
+        chatId:
+          type: string
+          format: uuid
+          description: Идентификатор чата.
+        message:
+          $ref: "#/components/schemas/SentMessage"
+        clientMessageId:
+          type: string
+          format: uuid
+          description: Клиентский идентификатор сообщения, сгенерированный на клиенте случайным образом.
+
+    SendMessageResponsePayload:
+      type: object
+      required: [method, clientMessageId, success]
+      properties:
+        method:
+          type: string
+          const: sendMessageResponse
+          description: Метод сообщения.
+        clientMessageId:
+          type: string
+          format: uuid
+          description: Клиентский идентификатор сообщения.
+        success:
+          type: boolean
+          description: "Успешность отправки сообщения."
+        error:
+          type: string
+          description: "Описание ошибки в случае ее возникновения."
+        seqnum:
+          type: integer
+          description: Порядковый номер сообщения.
+        sentAt:
+          type: string
+          format: "date-time"
+          description: Время отправки сообщения, присвоенное сервером.
+
+    ReceiveMessagePayload:
+      type: object
+      required: [method, chatId, senderId, message, seqnum]
+      properties:
+        method:
+          type: string
+          const: receiveMessage
+          description: Метод сообщения.
+        chatId:
+          type: string
+          format: uuid
+          description: Идентификатор чата.
+        senderId:
+          type: string
+          format: uuid
+          description: Идентификатор отправителя.
+        message:
+          $ref: "#/components/schemas/Message"
+        seqnum:
+          type: integer
+          description: Порядковый номер сообщения.
+
+    Message:
+      type: object
+      description: Входящее сообщение.
+      required: [content]
+      properties:
+        content:
+          type: string
+          description: Текст сообщения.
+        sentAt:
+          type: string
+          format: "date-time"
+          description: Время отправки сообщения.
+
+    SentMessage:
+      type: object
+      description: Исходящее сообщение.
+      required: [content]
+      properties:
+        content:
+          type: string
+          description: Текст сообщения.

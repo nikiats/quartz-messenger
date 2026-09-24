@@ -47,7 +47,22 @@ sequenceDiagram
     G-->>M: 202
 ```
 
-## Загрузка сообщений
+## Загрузка истории сообщений
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Клиент
+    participant M as Сервис мессенджера
+    participant P as PostgreSQL
+
+    C->>M: GET /chats/{id}/messages?before=X&limit=Z
+    M->>P: чтение сообщений
+    P-->>M: сообщения
+    M-->>C: сообщения
+```
+
+## Загрузка неполученных сообщений
 
 ```mermaid
 sequenceDiagram
@@ -59,7 +74,7 @@ sequenceDiagram
 
     C->>G: подключение и аутентификация
     G-->>C: соединение установлено
-    C->>M: GET /chats/{id}/messages?before=X&limit=Z
+    C->>M: GET /chats/{id}/messages?after=Y&limit=Z
     M->>P: чтение сообщений
     P-->>M: сообщения
     M-->>C: сообщения
