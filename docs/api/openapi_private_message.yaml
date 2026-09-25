@@ -1,7 +1,7 @@
 openapi: 3.0.0
 info:
   title: Взаимодействие с сервисом мессенджера
-  description: Внутренние запросы к сервису мессенджера
+  description: "Внутренние запросы к сервису мессенджера. Любая ручка может ответить 500 с телом Error."
   version: 1.0.0
 
 tags:
@@ -17,7 +17,7 @@ paths:
       tags:
         - "Отправка сообщения"
       summary: "Отправка сообщения."
-      description: "Отправка сообщения."
+      description: "Отправка сообщения. Отправитель обязан быть участником указанного чата."
       requestBody:
         required: true
         content:
@@ -32,7 +32,13 @@ paths:
               schema:
                 $ref: "#/components/schemas/SentMessageResponse"
         "400":
-          description: "Некорректный запрос."
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /sessions/validate:
     post:
       tags:
@@ -52,14 +58,41 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ValidateResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "401":
-          description: "Сессия невалидна."
+          $ref: "#/components/responses/Unauthorized"
 
 components:
   securitySchemes:
     internalAuth:
       type: http
       scheme: bearer
+  responses:
+    BadRequest:
+      description: "Некорректный запрос."
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Unauthorized:
+      description: "Требуется авторизация."
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Forbidden:
+      description: "Недостаточно прав."
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      description: "Ресурс отсутствует."
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
   schemas:
     SendingMessage:
       type: object
@@ -67,7 +100,7 @@ components:
         content:
           type: string
           minLength: 1
-          maxLength: 100
+          maxLength: 1000
         clientMessageId:
           type: string
           format: uuid
@@ -121,3 +154,22 @@ components:
         - userId
         - expiresAt
         - sessionId
+
+    Error:
+      type: object
+      properties:
+        code:
+          type: string
+          description: "Машиночитаемый код ошибки."
+          enum:
+            - validation_failed
+            - invalid_token
+            - forbidden
+            - not_found
+            - internal
+        message:
+          type: string
+          description: "Описание для разработчика, не предназначенное для показа пользователю."
+      required:
+        - code
+        - message

@@ -1,7 +1,7 @@
 openapi: 3.0.0
 info:
   title: Взаимодействие с шлюзом соединений
-  description: Внутренние запросы к шлюзу соединений
+  description: "Внутренние запросы к шлюзу соединений. Любая ручка может ответить 500 с телом Error."
   version: 1.0.0
 
 tags:
@@ -28,7 +28,9 @@ paths:
         "202":
           description: "Сообщение передано в доставку."
         "400":
-          description: "Некорректный запрос."
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
   /connections/{sessionId}:
     delete:
       tags:
@@ -45,12 +47,27 @@ paths:
       responses:
         "204":
           description: "Соединение разорвано или отсутствует."
+        "401":
+          $ref: "#/components/responses/Unauthorized"
 
 components:
   securitySchemes:
     internalAuth:
       type: http
       scheme: bearer
+  responses:
+    BadRequest:
+      description: "Некорректный запрос."
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Unauthorized:
+      description: "Требуется авторизация."
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
   schemas:
     ReceivedMessage:
       type: object
@@ -79,3 +96,22 @@ components:
         - senderId
         - recipientId
         - sentAt
+
+    Error:
+      type: object
+      properties:
+        code:
+          type: string
+          description: "Машиночитаемый код ошибки."
+          enum:
+            - validation_failed
+            - invalid_token
+            - forbidden
+            - not_found
+            - internal
+        message:
+          type: string
+          description: "Описание для разработчика, не предназначенное для показа пользователю."
+      required:
+        - code
+        - message

@@ -1,12 +1,12 @@
 openapi: 3.0.0
 info:
   title: Взаимодействие клиента с сервисом мессенджера
-  description: Клиентские запросы к сервису мессенджера
+  description: "Клиентские запросы к сервису мессенджера. Любая ручка может ответить 500 с телом Error."
   version: 1.0.0
 
 tags:
-  - name: Авторизация
-  - name: "Профиль пользователя"
+  - name: "Авторизация"
+  - name: "Пользователи"
   - name: "Чаты"
   - name: "Участники чатов"
   - name: "Сообщения"
@@ -19,8 +19,8 @@ paths:
     post:
       tags:
         - Авторизация
-      summary: Создать пользователя.
-      description: Создать пользователя.
+      summary: Создание пользователя.
+      description: Создание пользователя.
       security: []
       requestBody:
         required: true
@@ -31,8 +31,55 @@ paths:
       responses:
         "201":
           description: Пользователь создан.
-        "500":
-          description: Внутренняя ошибка сервера.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+    get:
+      tags:
+        - "Пользователи"
+      summary: "Поиск пользователей по юзернейму."
+      description: "Поиск пользователей по юзернейму."
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "Список найденных пользователей. Алгоритм выдачи определяется конкретной реализацией сервера включая возможную выдачу пустого результата при слишком коротком запросе."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserSearchResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /users/{id}:
+    get:
+      tags:
+        - "Пользователи"
+      summary: "Информация о пользователе."
+      description: "Информация о пользователе."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: "Информация о пользователе."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /sessions:
     post:
       tags:
@@ -53,8 +100,10 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SessionCredentials"
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "401":
-          description: Данные для входа некорректны.
+          $ref: "#/components/responses/Unauthorized"
   /tokens:
     post:
       tags:
@@ -76,15 +125,15 @@ paths:
               schema:
                 $ref: "#/components/schemas/SessionCredentials"
         "400":
-          description: "Некорректный запрос."
+          $ref: "#/components/responses/BadRequest"
         "401":
-          description: "Токен некорректен."
+          $ref: "#/components/responses/Unauthorized"
   /sessions/{id}:
     delete:
       tags:
         - Авторизация
       summary: Инвалидировать сессию.
-      description: Инвалидировать сессию.
+      description: Инвалидировать сессию. Инвалидация доступна только для собственных сессий.
       parameters:
         - name: id
           in: path
@@ -95,10 +144,16 @@ paths:
       responses:
         "204":
           description: Сессия инвалидирована
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /profile:
     patch:
       tags:
-        - "Профиль пользователя"
+        - "Пользователи"
       summary: "Изменение настроек профиля пользователя."
       description: "Изменение настроек профиля пользователя."
       requestBody:
@@ -110,12 +165,18 @@ paths:
       responses:
         "200":
           description: "Настройки успешно изменены."
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/Conflict"
   /chats:
     get:
       tags:
         - "Чаты"
       summary: "Список чатов пользователя."
-      description: "Список чатов пользователя."
+      description: "Список чатов пользователя. Удаленные чаты отсутствуют в выдаче."
       responses:
         "200":
           description: "Список чатов."
@@ -125,6 +186,8 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Chat"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
     post:
       tags:
         - "Чаты"
@@ -143,6 +206,57 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Chat"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /chats/{id}:
+    get:
+      tags:
+        - "Чаты"
+      summary: "Получение информации о чате."
+      description: "Получение информации о чате. Информацию об удаленном чате получить невозможно."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: "Информация о чате."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Chat"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags:
+        - "Чаты"
+      summary: "Удаление чата."
+      description: "Удаление чата. Для группового чата доступно исключительно администратору. Для личного чата доступно любому из участников."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: "Чат удален."
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /chats/{id}/messages:
     get:
       tags:
@@ -194,8 +308,12 @@ paths:
                     type: array
                     items:
                       $ref: "#/components/schemas/Message"
-        "403":
-          description: "Нет прав."
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
     post:
       tags:
         - "Сообщения"
@@ -223,16 +341,18 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Message"
-        "403":
-          description: "Нет прав."
         "400":
-          description: "Некорректный запрос."
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /chats/{id}/members:
     get:
       tags:
         - "Участники чатов"
       summary: "Участники чата."
-      description: "Участники чата."
+      description: "Участники чата. Для удаленного чата получить список участников невозможно."
       parameters:
         - name: id
           in: path
@@ -249,8 +369,10 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Member"
-        "403":
-          description: "Недостаточно прав."
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
     post:
       tags:
         - "Участники чатов"
@@ -272,14 +394,22 @@ paths:
       responses:
         "201":
           description: "Участник добавлен."
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "403":
-          description: "Недостаточно прав."
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
   /chats/{id}/members/{userId}:
     delete:
       tags:
         - "Участники чатов"
-      summary: "Удалить участника."
-      description: "Удалить участника."
+      summary: "Удаление участника."
+      description: "Удаление участника из чата. Удаление собственного пользователя из чата является выходом из чата и доступно каждому участнику. Удаление других участников доступно исключительно администратору. Выход администратора приводит к назначению нового псевдослучайным образом. Из личного чата выход невозможен."
       parameters:
         - name: id
           in: path
@@ -297,13 +427,52 @@ paths:
         "204":
           description: "Участник удален."
         "400":
-          description: "Некорректный запрос."
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
 
 components:
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
+  responses:
+    BadRequest:
+      description: "Некорректный запрос."
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Unauthorized:
+      description: "Требуется авторизация."
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Forbidden:
+      description: "Недостаточно прав."
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      description: "Ресурс отсутствует."
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Conflict:
+      description: "Конфликт с текущим состоянием."
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
   schemas:
     UserCreate:
       type: object
@@ -374,6 +543,9 @@ components:
         lastMessageAt:
           type: string
           format: "date-time"
+        lastSeqnum:
+          type: integer
+          format: int64
       required:
         - id
         - type
@@ -428,6 +600,8 @@ components:
           type: string
           format: uuid
         content:
+          minLength: 1
+          maxLength: 1000
           type: string
       required:
         - clientMessageId
@@ -456,3 +630,48 @@ components:
           format: uuid
       required:
         - userId
+
+    User:
+      type: object
+      properties:
+        userId:
+          type: string
+          format: uuid
+        username:
+          type: string
+          minLength: 1
+        visibleName:
+          type: string
+          minLength: 1
+      required:
+        - userId
+        - username
+
+    UserSearchResponse:
+      type: array
+      items:
+        $ref: "#/components/schemas/User"
+
+    Error:
+      type: object
+      properties:
+        code:
+          type: string
+          description: "Машиночитаемый код ошибки."
+          enum:
+            - validation_failed
+            - invalid_credentials
+            - invalid_token
+            - forbidden
+            - not_found
+            - login_taken
+            - username_taken
+            - already_member
+            - admin_not_transferred
+            - internal
+        message:
+          type: string
+          description: "Описание для разработчика, не предназначенное для показа пользователю."
+      required:
+        - code
+        - message
