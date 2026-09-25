@@ -20,7 +20,7 @@ CREATE TABLE users (
     password_hash TEXT        NOT NULL,
     username      CITEXT      UNIQUE,
     visible_name  TEXT        NOT NULL DEFAULT 'Пользователь',        
-	suspended     BOOLEAN     DEFAULT FALSE,
+    suspended     BOOLEAN     NOT NULL DEFAULT FALSE,
     created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -34,7 +34,8 @@ CREATE TABLE sessions (
     user_id            UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     refresh_token_hash TEXT        NOT NULL UNIQUE,  -- хранится хеш, не сам токен
     expires_at         TIMESTAMPTZ NOT NULL,         -- срок жизни токена обновления
-    created_at         TIMESTAMPTZ NOT NULL DEFAULT now()
+    created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+    revoked_at         TIMESTAMPTZ DEFAULT NULL
 );
 
 -- отзыв всех сессий пользователя
@@ -122,9 +123,9 @@ CREATE INDEX messages_content_trgm_idx ON messages USING GIN (content gin_trgm_o
 
 -- WITH dup AS (
 --     SELECT seqnum, sent_at FROM messages
---      WHERE chat_id = $1 AND sender_id = $2 AND client_message_id = $4
+--      WHERE sender_id = $2 AND client_message_id = $4
 -- ), updchat AS (
---     UPDATE chats SET last_seqnum = last_seqnum + 1
+--     UPDATE chats SET last_seqnum = last_seqnum + 1, last_message_at = NOW()
 --      WHERE id = $1 AND NOT EXISTS (SELECT 1 FROM dup)
 --     RETURNING last_seqnum
 -- ), ins AS (
@@ -145,10 +146,15 @@ CREATE INDEX messages_content_trgm_idx ON messages USING GIN (content gin_trgm_o
 --  не передав права, невозможно. Ноль затронутых строк означает либо
 --  отсутствие участника, либо попытку удалить администратора.
 --
+-- BEGIN;
+
+-- SELECT 1 FROM chats WHERE id = $1 FOR UPDATE;
 -- DELETE FROM chat_members
 --  WHERE chat_id = $1
 --    AND user_id = $2
 --    AND user_id <> (SELECT admin FROM chats WHERE id = $1);
+
+-- COMMIT;
 
 
 -- ============================================================
@@ -163,7 +169,13 @@ CREATE INDEX messages_content_trgm_idx ON messages USING GIN (content gin_trgm_o
 --  Преемник выбирается в CTE: обращений к нему два, а `random()`
 --  должен отработать один раз.
 --
+--  Строка чата блокируется до выбора преемника: иначе параллельный
+--  выход выбранного участника оставит чат с администратором, который
+--  уже не состоит в чате.
+--
 -- BEGIN;
+--
+-- SELECT 1 FROM chats WHERE id = $1 AND admin = $2 AND NOT deleted FOR UPDATE;
 --
 -- WITH successor AS (
 --     SELECT user_id FROM chat_members
