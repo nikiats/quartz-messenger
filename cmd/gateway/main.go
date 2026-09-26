@@ -1,17 +1,54 @@
 package main
 
 import (
-	"fmt"
+	"log/slog"
+	"net/http"
 	"os"
 
 	"quaztz/internal/gateway/config"
+	"quaztz/internal/gateway/connection"
+	"quaztz/internal/gateway/messenger"
+	privatehttp "quaztz/internal/gateway/transport/http"
+	"quaztz/internal/gateway/transport/ws"
 	loader "quaztz/internal/platform/config"
 )
 
 func main() {
-	var cfg config.Config
-	if err := loader.Load(&cfg, "deploy/gateway.env"); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+	if err := run(); err != nil {
+		slog.Error("gateway stopped", "error", err)
 		os.Exit(1)
 	}
+}
+
+func run() error {
+	var cfg config.Config
+	if err := loader.Load(&cfg, "deploy/gateway.env"); err != nil {
+		return err
+	}
+
+	client, err := messenger.NewClient(cfg.MessengerURL, cfg.InternalToken)
+	if err != nil {
+		return err
+	}
+
+	registry := connection.NewRegistry()
+
+	public := http.NewServeMux()
+	public.Handle("GET /ws", ws.NewHandler(client, registry))
+
+	private := privatehttp.NewHandler(registry, cfg.InternalToken)
+
+	errs := make(chan error, 2)
+
+	go func() {
+		errs <- http.ListenAndServe(cfg.WSAddr, public)
+	}()
+
+	go func() {
+		errs <- http.ListenAndServe(cfg.PrivateAddr, private)
+	}()
+
+	slog.Info("gateway started", "ws", cfg.WSAddr, "private", cfg.PrivateAddr)
+
+	return <-errs
 }
