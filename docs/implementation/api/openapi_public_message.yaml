@@ -296,8 +296,11 @@ paths:
             type: integer
         - name: q
           in: query
+          description: "Строка поиска: вхождение подстроки без учета регистра."
           schema:
             type: string
+            minLength: 1
+            maxLength: 100
       responses:
         "200":
           description: "Сообщения чата. Обязательно указание либо before, либо after. Поиск пагинируется вверх с помощью before. Неуказание способа пагинации или указание обоих сразу или поиск с пагинацией не before является некорректным запросом."
@@ -405,9 +408,17 @@ paths:
         "403":
           $ref: "#/components/responses/Forbidden"
         "404":
-          $ref: "#/components/responses/NotFound"
+          description: "Чат или добавляемый пользователь не найден (not_found)."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "409":
-          $ref: "#/components/responses/Conflict"
+          description: "Пользователь уже является участником чата (already_member)."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /chats/{id}/members/{userId}:
     delete:
       tags:
@@ -562,11 +573,17 @@ components:
             - private
             - group
         title:
+          description: "Название группового чата. Обязательно для группового чата, запрещено для личного."
           type: string
+          minLength: 1
+          maxLength: 100
         memberIds:
-          description: "Список участников, добавляемых в чат за исключением текущего пользователя (иначе запрос признается некорректным). 
+          description: "Список участников, добавляемых в чат, за исключением текущего пользователя.
+            > Присутствие в списке текущего пользователя или повторяющихся идентификаторов делает запрос некорректным (400).
             > Для личного чата обязательно должен содержать единственного участника - собеседника, с которым создается чат."
           type: array
+          maxItems: 100
+          uniqueItems: true
           items:
             type: string
             format: uuid

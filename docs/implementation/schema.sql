@@ -1,8 +1,6 @@
 -- Схема базы данных мессенджера.
 
-CREATE EXTENSION IF NOT EXISTS pg_trgm;
 CREATE EXTENSION IF NOT EXISTS citext;
-
 
 -- ============================================================
 --  Перечисления
@@ -62,6 +60,8 @@ CREATE TABLE chats (
     CHECK ( (type = 'private') = (user_a IS NOT NULL AND user_b IS NOT NULL) ),
     -- администратор задан тогда и только тогда, когда чат групповой
     CHECK ( (type = 'group') = (admin IS NOT NULL) ),
+    -- название задано тогда и только тогда, когда чат групповой
+    CHECK ( (type = 'group') = (title IS NOT NULL) ),
     -- канонический порядок пары: идентификатор чата не зависит от инициатора
     CHECK ( user_a IS NULL OR user_a < user_b )
 );
@@ -95,98 +95,12 @@ CREATE TABLE messages (
     sender_id         UUID        NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     content           TEXT        NOT NULL,
     client_message_id UUID        NOT NULL,
-    sent_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
+    sent_at           TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
 
     -- сообщение идентифицируется парой чата и порядкового номера;
     -- этот же индекс обслуживает пагинацию и подгрузку неполученных сообщений
     PRIMARY KEY (chat_id, seqnum),
 
-    -- идемпотентность повторной отправки
-    UNIQUE (sender_id, client_message_id)
+    -- идемпотентность повторной отправки в пределах чата
+    UNIQUE (chat_id, sender_id, client_message_id)
 );
-
--- поиск по подстроке в пределах чата
-CREATE INDEX messages_content_trgm_idx ON messages USING GIN (content gin_trgm_ops);
-
-
--- ============================================================
---  Добавление сообщения в чат
--- ============================================================
---
---  Блокирующий запрос отбирает только живой чат. Ноль строк означает,
---  что чата нет либо он удален: транзакция прерывается, следующий
---  запрос не выполняется.
---
--- BEGIN;
-
--- SELECT last_seqnum FROM chats WHERE id = $1 AND NOT deleted FOR UPDATE;
-
--- WITH dup AS (
---     SELECT seqnum, sent_at FROM messages
---      WHERE sender_id = $2 AND client_message_id = $4
--- ), updchat AS (
---     UPDATE chats SET last_seqnum = last_seqnum + 1, last_message_at = NOW()
---      WHERE id = $1 AND NOT EXISTS (SELECT 1 FROM dup)
---     RETURNING last_seqnum
--- ), ins AS (
---     INSERT INTO messages (chat_id, seqnum, sender_id, content, client_message_id)
---     SELECT $1, updchat.last_seqnum, $2, $3, $4 FROM updchat
---     RETURNING seqnum, sent_at
--- )
--- SELECT * FROM ins UNION ALL SELECT * FROM dup;
-
--- COMMIT;
---
-
--- ============================================================
---  Удаление участника из чата
--- ============================================================
---
---  Условие на администратора включено в сам запрос: удалить админа,
---  не передав права, невозможно. Ноль затронутых строк означает либо
---  отсутствие участника, либо попытку удалить администратора.
---
--- BEGIN;
-
--- SELECT 1 FROM chats WHERE id = $1 FOR UPDATE;
--- DELETE FROM chat_members
---  WHERE chat_id = $1
---    AND user_id = $2
---    AND user_id <> (SELECT admin FROM chats WHERE id = $1);
-
--- COMMIT;
-
-
--- ============================================================
---  Выход администратора из группового чата
--- ============================================================
---
---  Права передаются псевдослучайно выбранному участнику. Если
---  преемника нет, значит администратор -- последний участник: чат
---  отмечается удаленным, а администратор остается прежним, поскольку
---  ограничение требует непустого администратора у группового чата.
---
---  Преемник выбирается в CTE: обращений к нему два, а `random()`
---  должен отработать один раз.
---
---  Строка чата блокируется до выбора преемника: иначе параллельный
---  выход выбранного участника оставит чат с администратором, который
---  уже не состоит в чате.
---
--- BEGIN;
---
--- SELECT 1 FROM chats WHERE id = $1 AND admin = $2 AND NOT deleted FOR UPDATE;
---
--- WITH successor AS (
---     SELECT user_id FROM chat_members
---      WHERE chat_id = $1 AND user_id <> $2
---      ORDER BY random() LIMIT 1
--- )
--- UPDATE chats
---    SET admin   = COALESCE((SELECT user_id FROM successor), admin),
---        deleted = NOT EXISTS (SELECT 1 FROM successor)
---  WHERE id = $1;
---
--- DELETE FROM chat_members WHERE chat_id = $1 AND user_id = $2;
---
--- COMMIT;
