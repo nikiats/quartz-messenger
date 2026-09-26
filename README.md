@@ -31,16 +31,16 @@
 
 | Документ | Содержание |
 |---|---|
-| [Упрощения для MVP](./docs/implementation/mvp.md) | отличия от целевой архитектуры, итоговый стек, схема компонентов |
-| [Сценарии](./docs/implementation/scenarios.md) | диаграммы последовательности основных сценариев |
-| [Решения по хранению данных](./docs/implementation/storage.md) | участники чатов, удаление чата, нумерация сообщений, конкурентный доступ |
-| Схема базы данных | [в нотации ER](./docs/implementation/database.md) и [в нотации SQL](./docs/implementation/schema.sql) |
+| [Упрощения для MVP](./docs/tech/mvp.md) | отличия от целевой архитектуры, итоговый стек, схема компонентов |
+| [Сценарии](./docs/tech/scenarios.md) | диаграммы последовательности основных сценариев |
+| [Решения по хранению данных](./docs/tech/storage.md) | участники чатов, удаление чата, нумерация сообщений, конкурентный доступ |
+| Схема базы данных | [в нотации ER](./docs/tech/database.md) и [в нотации SQL](./docs/tech/schema.sql) |
 
 **API**
 
 | Спецификация | Назначение |
 |---|---|
-| [Публичное API сервиса мессенджера](./docs/implementation/api/openapi_public_message.yaml) | OpenAPI, запросы клиента |
-| [Внутреннее API сервиса мессенджера](./docs/implementation/api/openapi_private_message.yaml) | OpenAPI, запросы шлюза |
-| [Внутреннее API шлюза соединений](./docs/implementation/api/openapi_private_gateway.yaml) | OpenAPI, запросы сервиса мессенджера |
-| [WebSocket API шлюза соединений](./docs/implementation/api/asyncapi.yaml) | AsyncAPI, обмен клиента со шлюзом |
+| [Публичное API сервиса мессенджера](./api/messenger/public.openapi.yaml) | OpenAPI, запросы клиента |
+| [Внутреннее API сервиса мессенджера](./api/messenger/private.openapi.yaml) | OpenAPI, запросы шлюза |
+| [Внутреннее API шлюза соединений](./api/gateway/private.openapi.yaml) | OpenAPI, запросы сервиса мессенджера |
+| [WebSocket API шлюза соединений](./api/gateway/websocket.asyncapi.yaml) | AsyncAPI, обмен клиента со шлюзом |

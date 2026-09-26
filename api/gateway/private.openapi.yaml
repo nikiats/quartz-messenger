@@ -14,6 +14,7 @@ security:
 paths:
   /deliver:
     post:
+      operationId: deliverMessage
       tags:
         - "Передача сообщений"
       summary: "Доставка сообщения указанному пользователю."
@@ -35,6 +36,7 @@ paths:
           $ref: "#/components/responses/Unauthorized"
   /connections/{sessionId}:
     delete:
+      operationId: invalidateSession
       tags:
         - "Управление соединениями"
       summary: "Разрыв соединений указанной сессии."

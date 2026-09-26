@@ -17,6 +17,7 @@ security:
 paths:
   /users:
     post:
+      operationId: registerUser
       tags:
         - Авторизация
       summary: Создание пользователя.
@@ -36,6 +37,7 @@ paths:
         "409":
           $ref: "#/components/responses/Conflict"
     get:
+      operationId: searchUsers
       tags:
         - "Пользователи"
       summary: "Поиск пользователей по юзернейму."
@@ -58,6 +60,7 @@ paths:
           $ref: "#/components/responses/Unauthorized"
   /users/{id}:
     get:
+      operationId: getUserInfo
       tags:
         - "Пользователи"
       summary: "Информация о пользователе."
@@ -82,6 +85,7 @@ paths:
           $ref: "#/components/responses/NotFound"
   /sessions:
     post:
+      operationId: loginSession
       tags:
         - Авторизация
       summary: Создать сессию.
@@ -109,6 +113,7 @@ paths:
           $ref: "#/components/responses/Forbidden"
   /tokens:
     post:
+      operationId: refreshToken
       tags:
         - Авторизация
       summary: "Обновление токена."
@@ -133,6 +138,7 @@ paths:
           $ref: "#/components/responses/Unauthorized"
   /sessions/{id}:
     delete:
+      operationId: invalidateSession
       tags:
         - Авторизация
       summary: Инвалидировать сессию.
@@ -153,6 +159,7 @@ paths:
           $ref: "#/components/responses/NotFound"
   /profile:
     patch:
+      operationId: editProfile
       tags:
         - "Пользователи"
       summary: "Изменение настроек профиля пользователя."
@@ -174,6 +181,7 @@ paths:
           $ref: "#/components/responses/Conflict"
   /chats:
     get:
+      operationId: getChats
       tags:
         - "Чаты"
       summary: "Список чатов пользователя."
@@ -190,6 +198,7 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
     post:
+      operationId: createChat
       tags:
         - "Чаты"
       summary: "Создать чат."
@@ -221,6 +230,7 @@ paths:
           $ref: "#/components/responses/NotFound"
   /chats/{id}:
     get:
+      operationId: getChatInfo
       tags:
         - "Чаты"
       summary: "Получение информации о чате."
@@ -244,6 +254,7 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
     delete:
+      operationId: deleteChat
       tags:
         - "Чаты"
       summary: "Удаление чата."
@@ -266,6 +277,7 @@ paths:
           $ref: "#/components/responses/NotFound"
   /chats/{id}/messages:
     get:
+      operationId: getMessages
       tags:
         - "Сообщения"
       summary: "История сообщений чата."
@@ -325,6 +337,7 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
     post:
+      operationId: sendMessage
       tags:
         - "Сообщения"
       summary: "Отправка сообщения."
@@ -359,6 +372,7 @@ paths:
           $ref: "#/components/responses/NotFound"
   /chats/{id}/members:
     get:
+      operationId: getChatMembers
       tags:
         - "Участники чатов"
       summary: "Участники чата."
@@ -384,6 +398,7 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
     post:
+      operationId: addChatMember
       tags:
         - "Участники чатов"
       summary: "Добавить участника."
@@ -424,6 +439,7 @@ paths:
                 $ref: "#/components/schemas/Error"
   /chats/{id}/members/{userId}:
     delete:
+      operationId: deleteChatMember
       tags:
         - "Участники чатов"
       summary: "Удаление участника."
