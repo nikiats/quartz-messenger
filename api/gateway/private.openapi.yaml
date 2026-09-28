@@ -19,8 +19,8 @@ paths:
         - "Передача сообщений"
       summary: "Доставка сообщения указанному пользователю."
       description: "Доставка сообщения указанному пользователю. 
-        > Не стоит использовать данный запрос для отправки отправленного пользователем сообщения на его другие устройства (соединения). 
-        > Независимо от успешности доставки возвращает код 202."
+        Не стоит использовать данный запрос для отправки отправленного пользователем сообщения на его другие устройства (соединения). 
+        Независимо от успешности доставки, возвращает код 202."
       requestBody:
         required: true
         content:
@@ -34,13 +34,15 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /connections/{sessionId}:
     delete:
       operationId: invalidateSession
       tags:
         - "Управление соединениями"
       summary: "Разрыв соединений указанной сессии."
-      description: "Разрыв соединений указанной сессии."
+      description: "Разрыв соединений указанной сессии. Сразу отмечает сессию как невалидную, не позволяя выполнять под ней действия."
       parameters:
         - name: sessionId
           in: path
@@ -51,8 +53,12 @@ paths:
       responses:
         "204":
           description: "Соединение разорвано или отсутствует."
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
 
 components:
   securitySchemes:
@@ -65,13 +71,19 @@ components:
       content:
         application/json:
           schema:
-            $ref: "#/components/schemas/Error"
+            $ref: "#/components/schemas/Error400"
     Unauthorized:
       description: "Требуется авторизация."
       content:
         application/json:
           schema:
-            $ref: "#/components/schemas/Error"
+            $ref: "#/components/schemas/Error401"
+    InternalError:
+      description: "Внутренняя ошибка."
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error500"
   schemas:
     ReceivedMessage:
       type: object
@@ -101,21 +113,45 @@ components:
         - recipientId
         - sentAt
 
-    Error:
+    Error400:
       type: object
       properties:
         code:
           type: string
           description: "Машиночитаемый код ошибки."
           enum:
-            - validation_failed
-            - invalid_token
-            - forbidden
-            - not_found
-            - internal
+            - invalid_request
         message:
           type: string
-          description: "Описание для разработчика, не предназначенное для показа пользователю."
+          description: "Описание ошибки."
+      required:
+        - code
+        - message
+    Error401:
+      type: object
+      properties:
+        code:
+          type: string
+          description: "Машиночитаемый код ошибки."
+          enum:
+            - unauthorized_request
+        message:
+          type: string
+          description: "Описание ошибки."
+      required:
+        - code
+        - message
+    Error500:
+      type: object
+      properties:
+        code:
+          type: string
+          description: "Машиночитаемый код ошибки."
+          enum:
+            - internal_error
+        message:
+          type: string
+          description: "Описание ошибки."
       required:
         - code
         - message
