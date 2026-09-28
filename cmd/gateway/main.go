@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"time"
 
 	"quaztz/internal/gateway/config"
 	"quaztz/internal/gateway/connection"
@@ -40,12 +41,24 @@ func run() error {
 
 	errs := make(chan error, 2)
 
+	// запуск WebSocket сервера
+	wsServer := &http.Server{
+		Addr:              cfg.WSAddr,
+		Handler:           public,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
 	go func() {
-		errs <- http.ListenAndServe(cfg.WSAddr, public)
+		errs <- wsServer.ListenAndServe()
 	}()
 
+	// запуск сервера приватного API
+	privateApiServer := &http.Server{
+		Addr:              cfg.PrivateAddr,
+		Handler:           private,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
 	go func() {
-		errs <- http.ListenAndServe(cfg.PrivateAddr, private)
+		errs <- privateApiServer.ListenAndServe()
 	}()
 
 	slog.Info("gateway started", "ws", cfg.WSAddr, "private", cfg.PrivateAddr)

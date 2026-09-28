@@ -61,6 +61,14 @@ components:
       payload:
         $ref: "#/components/schemas/AuthorizePayload"
 
+    SendMessage:
+      name: sendMessage
+      description: "Отправка сообщения. Важно: при возникновении ошибки, она возвращается через sendMessageResponse только в случае, если относится к бизнес-логике. Структурные ошибки возвращаются общей операцией error."
+      tags:
+        - name: "Сообщения"
+      payload:
+        $ref: "#/components/schemas/SendMessagePayload"
+
     AuthorizeResponse:
       name: authorizeResponse
       description: "Результат авторизации. В случае success: false соединение будет разорвано сервером."
@@ -85,14 +93,6 @@ components:
       payload:
         $ref: "#/components/schemas/ErrorPayload"
 
-    SendMessage:
-      name: sendMessage
-      description: Отправка сообщения.
-      tags:
-        - name: "Сообщения"
-      payload:
-        $ref: "#/components/schemas/SendMessagePayload"
-
     SendMessageResponse:
       name: sendMessageResponse
       description: Результат отправки сообщения.
@@ -112,21 +112,21 @@ components:
   schemas:
     ErrorBody:
       type: object
-      description: Причина отказа. Коды совпадают с кодами ошибок HTTP-интерфейса.
+      description: Причина отказа.
       required: [code, message]
       properties:
         code:
           type: string
           description: Машиночитаемый код ошибки.
           enum:
-            - validation_failed
-            - invalid_token
-            - forbidden
-            - not_found
+            - session_mismatch
+            - session_invalid
+            - send_failed
             - internal
+            - invalid_payload
         message:
           type: string
-          description: Описание для разработчика, не предназначенное для показа пользователю.
+          description: Описание ошибки.
 
     ErrorPayload:
       type: object
@@ -180,6 +180,8 @@ components:
         success:
           type: boolean
           description: "Успешность авторизации."
+        error:
+          $ref: "#/components/schemas/ErrorBody"
 
     RequireAuthorizePayload:
       type: object
@@ -237,7 +239,7 @@ components:
 
     ReceiveMessagePayload:
       type: object
-      required: [method, chatId, senderId, message, seqnum]
+      required: [method, chatId, senderId, message, seqnum, sentAt]
       properties:
         method:
           type: string
@@ -257,21 +259,21 @@ components:
           type: integer
           format: int64
           description: Порядковый номер сообщения.
+        sentAt:
+          type: string
+          format: "date-time"
+          description: Время отправки сообщения.
 
     Message:
       type: object
       description: Входящее сообщение.
-      required: [content, sentAt]
+      required: [content]
       properties:
         content:
           type: string
           minLength: 1
           maxLength: 1000
           description: Текст сообщения.
-        sentAt:
-          type: string
-          format: "date-time"
-          description: Время отправки сообщения.
 
     SentMessage:
       type: object
@@ -282,4 +284,4 @@ components:
           type: string
           minLength: 1
           maxLength: 1000
-          description: Текст сообщения. Максимальная длина составляет.
+          description: Текст сообщения.

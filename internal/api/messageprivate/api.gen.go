@@ -19,44 +19,89 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
-// Defines values for ErrorCode.
+// Defines values for Error400Code.
 const (
-	ErrorCodeForbidden        ErrorCode = "forbidden"
-	ErrorCodeInternal         ErrorCode = "internal"
-	ErrorCodeInvalidToken     ErrorCode = "invalid_token"
-	ErrorCodeNotFound         ErrorCode = "not_found"
-	ErrorCodeValidationFailed ErrorCode = "validation_failed"
+	InvalidRequest Error400Code = "invalid_request"
 )
 
-// Valid indicates whether the value is a known member of the ErrorCode enum.
-func (e ErrorCode) Valid() bool {
+// Valid indicates whether the value is a known member of the Error400Code enum.
+func (e Error400Code) Valid() bool {
 	switch e {
-	case ErrorCodeForbidden:
-		return true
-	case ErrorCodeInternal:
-		return true
-	case ErrorCodeInvalidToken:
-		return true
-	case ErrorCodeNotFound:
-		return true
-	case ErrorCodeValidationFailed:
+	case InvalidRequest:
 		return true
 	default:
 		return false
 	}
 }
 
-// Error defines model for Error.
-type Error struct {
-	// Code Машиночитаемый код ошибки.
-	Code ErrorCode `json:"code"`
+// Defines values for Error401Code.
+const (
+	UnauthorizedRequest Error401Code = "unauthorized_request"
+)
 
-	// Message Описание для разработчика, не предназначенное для показа пользователю.
+// Valid indicates whether the value is a known member of the Error401Code enum.
+func (e Error401Code) Valid() bool {
+	switch e {
+	case UnauthorizedRequest:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SentMessageResponseErrorCode.
+const (
+	SendFailed SentMessageResponseErrorCode = "send_failed"
+)
+
+// Valid indicates whether the value is a known member of the SentMessageResponseErrorCode enum.
+func (e SentMessageResponseErrorCode) Valid() bool {
+	switch e {
+	case SendFailed:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ValidateResponseErrorCode.
+const (
+	InvalidToken ValidateResponseErrorCode = "invalid_token"
+)
+
+// Valid indicates whether the value is a known member of the ValidateResponseErrorCode enum.
+func (e ValidateResponseErrorCode) Valid() bool {
+	switch e {
+	case InvalidToken:
+		return true
+	default:
+		return false
+	}
+}
+
+// Error400 defines model for Error400.
+type Error400 struct {
+	// Code Машиночитаемый код ошибки.
+	Code Error400Code `json:"code"`
+
+	// Message Описание ошибки.
 	Message string `json:"message"`
 }
 
-// ErrorCode Машиночитаемый код ошибки.
-type ErrorCode string
+// Error400Code Машиночитаемый код ошибки.
+type Error400Code string
+
+// Error401 defines model for Error401.
+type Error401 struct {
+	// Code Машиночитаемый код ошибки.
+	Code Error401Code `json:"code"`
+
+	// Message Описание ошибки.
+	Message string `json:"message"`
+}
+
+// Error401Code Машиночитаемый код ошибки.
+type Error401Code string
 
 // SendingMessage defines model for SendingMessage.
 type SendingMessage struct {
@@ -68,10 +113,23 @@ type SendingMessage struct {
 
 // SentMessageResponse defines model for SentMessageResponse.
 type SentMessageResponse struct {
-	ChatId openapi_types.UUID `json:"chatId"`
-	SentAt time.Time          `json:"sentAt"`
-	Seqnum int64              `json:"seqnum"`
+	Error *struct {
+		// Code Машиночитаемый код ошибки.
+		Code SentMessageResponseErrorCode `json:"code"`
+
+		// Message Описание ошибки.
+		Message string `json:"message"`
+	} `json:"error,omitempty"`
+	Message *struct {
+		ChatId openapi_types.UUID `json:"chatId"`
+		SentAt time.Time          `json:"sentAt"`
+		Seqnum int64              `json:"seqnum"`
+	} `json:"message,omitempty"`
+	Success bool `json:"success"`
 }
+
+// SentMessageResponseErrorCode Машиночитаемый код ошибки.
+type SentMessageResponseErrorCode string
 
 // TokenValidate defines model for TokenValidate.
 type TokenValidate struct {
@@ -80,22 +138,29 @@ type TokenValidate struct {
 
 // ValidateResponse defines model for ValidateResponse.
 type ValidateResponse struct {
-	ExpiresAt time.Time          `json:"expiresAt"`
-	SessionId openapi_types.UUID `json:"sessionId"`
-	UserId    openapi_types.UUID `json:"userId"`
+	Error *struct {
+		// Code Машиночитаемый код ошибки.
+		Code ValidateResponseErrorCode `json:"code"`
+
+		// Message Описание ошибки.
+		Message string `json:"message"`
+	} `json:"error,omitempty"`
+	Session *struct {
+		ExpiresAt time.Time          `json:"expiresAt"`
+		SessionId openapi_types.UUID `json:"sessionId"`
+		UserId    openapi_types.UUID `json:"userId"`
+	} `json:"session,omitempty"`
+	Success bool `json:"success"`
 }
 
+// ValidateResponseErrorCode Машиночитаемый код ошибки.
+type ValidateResponseErrorCode string
+
 // BadRequest defines model for BadRequest.
-type BadRequest = Error
-
-// Forbidden defines model for Forbidden.
-type Forbidden = Error
-
-// NotFound defines model for NotFound.
-type NotFound = Error
+type BadRequest = Error400
 
 // Unauthorized defines model for Unauthorized.
-type Unauthorized = Error
+type Unauthorized = Error401
 
 // SendMessageJSONRequestBody defines body for SendMessage for application/json ContentType.
 type SendMessageJSONRequestBody = SendingMessage
@@ -442,21 +507,17 @@ type ClientWithResponsesInterface interface {
 type SendMessageResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	// JSON201 the response for an HTTP 201 `application/json` response
-	JSON201 *SentMessageResponse
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *SentMessageResponse
 	// JSON400 the response for an HTTP 400 `application/json` response
 	JSON400 *BadRequest
 	// JSON401 the response for an HTTP 401 `application/json` response
 	JSON401 *Unauthorized
-	// JSON403 the response for an HTTP 403 `application/json` response
-	JSON403 *Forbidden
-	// JSON404 the response for an HTTP 404 `application/json` response
-	JSON404 *NotFound
 }
 
-// GetJSON201 returns the response for an HTTP 201 `application/json` response
-func (r SendMessageResponse) GetJSON201() *SentMessageResponse {
-	return r.JSON201
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r SendMessageResponse) GetJSON200() *SentMessageResponse {
+	return r.JSON200
 }
 
 // GetJSON400 returns the response for an HTTP 400 `application/json` response
@@ -467,16 +528,6 @@ func (r SendMessageResponse) GetJSON400() *BadRequest {
 // GetJSON401 returns the response for an HTTP 401 `application/json` response
 func (r SendMessageResponse) GetJSON401() *Unauthorized {
 	return r.JSON401
-}
-
-// GetJSON403 returns the response for an HTTP 403 `application/json` response
-func (r SendMessageResponse) GetJSON403() *Forbidden {
-	return r.JSON403
-}
-
-// GetJSON404 returns the response for an HTTP 404 `application/json` response
-func (r SendMessageResponse) GetJSON404() *NotFound {
-	return r.JSON404
 }
 
 // GetBody returns the raw response body bytes
@@ -633,12 +684,12 @@ func ParseSendMessageResponse(rsp *http.Response) (*SendMessageResponse, error) 
 	}
 
 	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest SentMessageResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON201 = &dest
+		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
 		var dest BadRequest
@@ -653,20 +704,6 @@ func ParseSendMessageResponse(rsp *http.Response) (*SendMessageResponse, error) 
 			return nil, err
 		}
 		response.JSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
-		var dest Forbidden
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON403 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest NotFound
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON404 = &dest
 
 	}
 
@@ -886,13 +923,9 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	return m
 }
 
-type BadRequestJSONResponse Error
+type BadRequestJSONResponse Error400
 
-type ForbiddenJSONResponse Error
-
-type NotFoundJSONResponse Error
-
-type UnauthorizedJSONResponse Error
+type UnauthorizedJSONResponse Error401
 
 type SendMessageRequestObject struct {
 	Body *SendMessageJSONRequestBody
@@ -902,16 +935,16 @@ type SendMessageResponseObject interface {
 	VisitSendMessageResponse(w http.ResponseWriter) error
 }
 
-type SendMessage201JSONResponse SentMessageResponse
+type SendMessage200JSONResponse SentMessageResponse
 
-func (response SendMessage201JSONResponse) VisitSendMessageResponse(w http.ResponseWriter) error {
+func (response SendMessage200JSONResponse) VisitSendMessageResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(201)
+	w.WriteHeader(200)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -940,34 +973,6 @@ func (response SendMessage401JSONResponse) VisitSendMessageResponse(w http.Respo
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(401)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type SendMessage403JSONResponse struct{ ForbiddenJSONResponse }
-
-func (response SendMessage403JSONResponse) VisitSendMessageResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(403)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type SendMessage404JSONResponse struct{ NotFoundJSONResponse }
-
-func (response SendMessage404JSONResponse) VisitSendMessageResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(404)
 	_, err := buf.WriteTo(w)
 	return err
 }

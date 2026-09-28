@@ -11,6 +11,12 @@ import (
 	"quaztz/internal/api/messageprivate"
 )
 
+var (
+	ErrInternal         = fmt.Errorf("internal error")
+	ErrSessionIncorrect = fmt.Errorf("incorrect session")
+	ErrSendFailed       = fmt.Errorf("message send failed")
+)
+
 const requestTimeout = 10 * time.Second
 
 type Session struct {
@@ -58,43 +64,48 @@ func (c *Client) ValidateSession(ctx context.Context, token string) (Session, er
 
 	resp, err := c.api.ValidateSessionWithResponse(ctx, body)
 	if err != nil {
-		return Session{}, fmt.Errorf("validate session: %w", err)
+		return Session{}, ErrInternal
+	}
+	if resp.JSON200 == nil {
+		return Session{}, ErrInternal
 	}
 
-	if resp.JSON200 == nil {
-		return Session{}, unexpected("validate session", resp.StatusCode(), resp.Body)
+	session := resp.JSON200.Session
+
+	if !resp.JSON200.Success || session == nil {
+		return Session{}, ErrSessionIncorrect
 	}
 
 	return Session{
-		UserID:    resp.JSON200.UserId,
-		SessionID: resp.JSON200.SessionId,
-		ExpiresAt: resp.JSON200.ExpiresAt,
+		UserID:    session.UserId,
+		SessionID: session.SessionId,
+		ExpiresAt: session.ExpiresAt,
 	}, nil
 }
 
-func (c *Client) SendMessage(ctx context.Context, m Message) (Sent, error) {
+func (c *Client) SendMessage(ctx context.Context, message Message) (Sent, error) {
 	body := messageprivate.SendingMessage{
-		ChatId:          m.ChatID,
-		SenderId:        m.SenderID,
-		ClientMessageId: m.ClientMessageID,
-		Content:         m.Content,
+		ChatId:          message.ChatID,
+		SenderId:        message.SenderID,
+		ClientMessageId: message.ClientMessageID,
+		Content:         message.Content,
 	}
 
 	resp, err := c.api.SendMessageWithResponse(ctx, body)
 	if err != nil {
-		return Sent{}, fmt.Errorf("send message: %w", err)
+		return Sent{}, ErrInternal
+	}
+	if resp.JSON200 == nil {
+		return Sent{}, ErrInternal
 	}
 
-	if resp.JSON201 == nil {
-		return Sent{}, unexpected("send message", resp.StatusCode(), resp.Body)
+	info := resp.JSON200.Message
+	if !resp.JSON200.Success || info == nil {
+		return Sent{}, ErrSendFailed
 	}
 
 	return Sent{
-		Seqnum: resp.JSON201.Seqnum,
-		SentAt: resp.JSON201.SentAt,
+		Seqnum: info.Seqnum,
+		SentAt: info.SentAt,
 	}, nil
-}
-
-func unexpected(op string, status int, body []byte) error {
-	return fmt.Errorf("%s: unexpected status %d: %s", op, status, body)
 }

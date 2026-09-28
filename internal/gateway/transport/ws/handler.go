@@ -28,11 +28,11 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	conn.SetReadLimit(readLimit)
 
-	s := &session{
-		conn:      conn,
+	connSession := &clientSession{
+		wsConn:    conn,
 		messenger: h.messenger,
 		registry:  h.registry,
 	}
 
-	s.run(r.Context())
+	connSession.run(r.Context())
 }

@@ -2,7 +2,6 @@ package http
 
 import (
 	"context"
-	"crypto/subtle"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -40,7 +39,7 @@ func (s server) DeliverMessage(
 ) (api.DeliverMessageResponseObject, error) {
 	m := req.Body
 
-	if !valid(m) {
+	if !messageValid(m) {
 		return api.DeliverMessage400JSONResponse{
 			BadRequestJSONResponse: api.BadRequestJSONResponse{
 				Code:    api.ValidationFailed,
@@ -69,7 +68,7 @@ func (s server) InvalidateSession(
 	return api.InvalidateSession204Response{}, nil
 }
 
-func valid(m *api.ReceivedMessage) bool {
+func messageValid(m *api.ReceivedMessage) bool {
 	return m.ChatId != uuid.Nil &&
 		m.SenderId != uuid.Nil &&
 		m.RecipientId != uuid.Nil &&
@@ -79,12 +78,12 @@ func valid(m *api.ReceivedMessage) bool {
 }
 
 func requireToken(token string, next http.Handler) http.Handler {
-	want := []byte("Bearer " + token)
+	desiredHeader := "Bearer " + token
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		got := []byte(r.Header.Get("Authorization"))
+		receivedHeader := r.Header.Get("Authorization")
 
-		if subtle.ConstantTimeCompare(got, want) != 1 {
+		if receivedHeader != desiredHeader {
 			writeError(w, http.StatusUnauthorized, api.InvalidToken, "invalid service token")
 			return
 		}

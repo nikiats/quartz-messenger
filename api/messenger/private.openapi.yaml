@@ -1,7 +1,7 @@
 openapi: 3.0.0
 info:
   title: Взаимодействие с сервисом мессенджера
-  description: "Внутренние запросы к сервису мессенджера. Любая ручка может ответить 500 с телом Error."
+  description: "Внутренние запросы к сервису мессенджера."
   version: 1.0.0
 
 tags:
@@ -26,8 +26,8 @@ paths:
             schema:
               $ref: "#/components/schemas/SendingMessage"
       responses:
-        "201": 
-          description: "Сообщение отправлено."
+        "200": 
+          description: "Результат отправки сообщения."
           content:
             application/json:
               schema:
@@ -36,10 +36,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
-        "403":
-          $ref: "#/components/responses/Forbidden"
-        "404":
-          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /sessions/validate:
     post:
       operationId: validateSession
@@ -64,6 +62,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
 
 components:
   securitySchemes:
@@ -76,25 +76,20 @@ components:
       content:
         application/json:
           schema:
-            $ref: "#/components/schemas/Error"
+            $ref: "#/components/schemas/Error400"
     Unauthorized:
-      description: "Требуется авторизация."
+      description: "Не авторизован."
       content:
         application/json:
           schema:
-            $ref: "#/components/schemas/Error"
-    Forbidden:
-      description: "Недостаточно прав."
+            $ref: "#/components/schemas/Error401"
+    InternalError:
+      description: "Внутренняя ошибка."
       content:
         application/json:
           schema:
-            $ref: "#/components/schemas/Error"
-    NotFound:
-      description: "Ресурс отсутствует."
-      content:
-        application/json:
-          schema:
-            $ref: "#/components/schemas/Error"
+            $ref: "#/components/schemas/Error500"
+
   schemas:
     SendingMessage:
       type: object
@@ -117,22 +112,45 @@ components:
         - clientMessageId
         - chatId
         - senderId
+
     SentMessageResponse:
       type: object
       properties:
-        chatId:
-          type: string
-          format: uuid
-        seqnum:
-          type: integer
-          format: int64
-        sentAt:
-          type: string
-          format: "date-time"
+        success:
+          type: boolean
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              description: "Машиночитаемый код ошибки."
+              enum:
+                - send_failed
+            message:
+              type: string
+              description: "Описание ошибки."
+          required:
+            - code
+            - message
+        message:
+          type: object
+          properties:
+            chatId:
+              type: string
+              format: uuid
+            seqnum:
+              type: integer
+              format: int64
+            sentAt:
+              type: string
+              format: "date-time"
+          required:
+            - chatId
+            - seqnum
+            - sentAt
       required:
-        - chatId
-        - seqnum
-        - sentAt
+        - success
+
     TokenValidate:
       type: object
       properties:
@@ -140,38 +158,85 @@ components:
           type: string
       required:
         - token
+      
     ValidateResponse:
       type: object
       properties:
-        userId:
-          type: string
-          format: uuid
-        sessionId:
-          type: string
-          format: uuid
-        expiresAt:
-          type: string
-          format: "date-time"
+        success:
+          type: boolean
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              description: "Машиночитаемый код ошибки."
+              enum:
+                - invalid_token
+            message:
+              type: string
+              description: "Описание ошибки."
+          required:
+            - code
+            - message
+        session:
+          type: object
+          properties:
+            userId:
+              type: string
+              format: uuid
+            sessionId:
+              type: string
+              format: uuid
+            expiresAt:
+              type: string
+              format: "date-time"
+          required:
+            - userId
+            - sessionId
+            - expiresAt
       required:
-        - userId
-        - expiresAt
-        - sessionId
+        - success
 
-    Error:
+    Error400:
       type: object
       properties:
         code:
           type: string
           description: "Машиночитаемый код ошибки."
           enum:
-            - validation_failed
-            - invalid_token
-            - forbidden
-            - not_found
-            - internal
+            - invalid_request
         message:
           type: string
-          description: "Описание для разработчика, не предназначенное для показа пользователю."
+          description: "Описание ошибки."
       required:
         - code
         - message
+    Error401:
+      type: object
+      properties:
+        code:
+          type: string
+          description: "Машиночитаемый код ошибки."
+          enum:
+            - unauthorized_request
+        message:
+          type: string
+          description: "Описание ошибки."
+      required:
+        - code
+        - message
+    Error500:
+      type: object
+      properties:
+        code:
+          type: string
+          description: "Машиночитаемый код ошибки."
+          enum:
+            - internal_error
+        message:
+          type: string
+          description: "Описание ошибки."
+      required:
+        - code
+        - message
+

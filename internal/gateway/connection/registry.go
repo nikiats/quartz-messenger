@@ -24,18 +24,18 @@ type Conn interface {
 	Close(reason string)
 }
 
-type set map[Conn]struct{}
+type connSet map[Conn]struct{}
 
 type Registry struct {
 	mu        sync.RWMutex
-	byUser    map[uuid.UUID]set
-	bySession map[uuid.UUID]set
+	byUser    map[uuid.UUID]connSet
+	bySession map[uuid.UUID]connSet
 }
 
 func NewRegistry() *Registry {
 	return &Registry{
-		byUser:    map[uuid.UUID]set{},
-		bySession: map[uuid.UUID]set{},
+		byUser:    map[uuid.UUID]connSet{},
+		bySession: map[uuid.UUID]connSet{},
 	}
 }
 
@@ -51,41 +51,41 @@ func (r *Registry) Remove(c Conn) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	remove(r.byUser, c.UserID(), c)
-	remove(r.bySession, c.SessionID(), c)
+	removeConnection(r.byUser, c.UserID(), c)
+	removeConnection(r.bySession, c.SessionID(), c)
 }
 
 func (r *Registry) Deliver(userID uuid.UUID, m Message) {
-	for _, c := range r.lookup(r.byUser, userID) {
-		c.Deliver(m)
+	for _, conn := range r.getConnections(r.byUser, userID) {
+		conn.Deliver(m)
 	}
 }
 
 func (r *Registry) CloseSession(sessionID uuid.UUID) {
-	for _, c := range r.lookup(r.bySession, sessionID) {
-		c.Close("session revoked")
+	for _, conn := range r.getConnections(r.bySession, sessionID) {
+		conn.Close("session revoked")
 	}
 }
 
-func (r *Registry) lookup(index map[uuid.UUID]set, id uuid.UUID) []Conn {
+func (r *Registry) getConnections(mapping map[uuid.UUID]connSet, id uuid.UUID) []Conn {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	return slices.Collect(maps.Keys(index[id]))
+	return slices.Collect(maps.Keys(mapping[id]))
 }
 
-func add(index map[uuid.UUID]set, id uuid.UUID, c Conn) {
-	if index[id] == nil {
-		index[id] = set{}
+func add(mapping map[uuid.UUID]connSet, id uuid.UUID, conn Conn) {
+	if mapping[id] == nil {
+		mapping[id] = connSet{}
 	}
 
-	index[id][c] = struct{}{}
+	mapping[id][conn] = struct{}{}
 }
 
-func remove(index map[uuid.UUID]set, id uuid.UUID, c Conn) {
-	delete(index[id], c)
+func removeConnection(mapping map[uuid.UUID]connSet, id uuid.UUID, conn Conn) {
+	delete(mapping[id], conn)
 
-	if len(index[id]) == 0 {
-		delete(index, id)
+	if len(mapping[id]) == 0 {
+		delete(mapping, id)
 	}
 }
