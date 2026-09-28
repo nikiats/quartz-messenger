@@ -32,10 +32,10 @@ func run() error {
 		return err
 	}
 
-	registry := connection.NewRegistry()
+	registry := connection.NewRegistry(cfg.AccessTTL)
 
 	public := http.NewServeMux()
-	public.Handle("GET /ws", ws.NewHandler(client, registry))
+	public.Handle("GET /ws", ws.NewHandler(client, registry, cfg.OriginPatterns))
 
 	private := privatehttp.NewHandler(registry, cfg.InternalToken)
 

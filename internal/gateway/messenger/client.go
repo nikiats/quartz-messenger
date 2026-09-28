@@ -3,6 +3,7 @@ package messenger
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -28,6 +29,7 @@ type Session struct {
 type Message struct {
 	ChatID          uuid.UUID
 	SenderID        uuid.UUID
+	SessionID       uuid.UUID
 	ClientMessageID uuid.UUID
 	Content         string
 }
@@ -64,9 +66,11 @@ func (c *Client) ValidateSession(ctx context.Context, token string) (Session, er
 
 	resp, err := c.api.ValidateSessionWithResponse(ctx, body)
 	if err != nil {
+		slog.Warn("messengerprivate ValidateSession error", "error", err)
 		return Session{}, ErrInternal
 	}
 	if resp.JSON200 == nil {
+		slog.Warn("messengerprivate ValidateSession error", "code", resp.StatusCode(), "body", string(resp.GetBody()))
 		return Session{}, ErrInternal
 	}
 
@@ -89,13 +93,16 @@ func (c *Client) SendMessage(ctx context.Context, message Message) (Sent, error)
 		SenderId:        message.SenderID,
 		ClientMessageId: message.ClientMessageID,
 		Content:         message.Content,
+		SessionId:       message.SessionID,
 	}
 
 	resp, err := c.api.SendMessageWithResponse(ctx, body)
 	if err != nil {
+		slog.Warn("messengerprivate SendMessage error", "error", err)
 		return Sent{}, ErrInternal
 	}
 	if resp.JSON200 == nil {
+		slog.Warn("messengerprivate SendMessage error", "code", resp.StatusCode(), "body", string(resp.GetBody()))
 		return Sent{}, ErrInternal
 	}
 

@@ -10,17 +10,22 @@ import (
 )
 
 type Handler struct {
-	messenger *messenger.Client
-	registry  *connection.Registry
+	messenger      *messenger.Client
+	registry       *connection.Registry
+	originPatterns []string
 }
 
-func NewHandler(m *messenger.Client, r *connection.Registry) *Handler {
-	return &Handler{messenger: m, registry: r}
+func NewHandler(m *messenger.Client, r *connection.Registry, originPattern []string) *Handler {
+	return &Handler{
+		messenger:      m,
+		registry:       r,
+		originPatterns: originPattern,
+	}
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
-		InsecureSkipVerify: true,
+		OriginPatterns: h.originPatterns,
 	})
 	if err != nil {
 		return

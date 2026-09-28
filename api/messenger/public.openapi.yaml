@@ -131,7 +131,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SessionCredentials"
+                $ref: "#/components/schemas/RefreshedTokens"
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -529,6 +529,17 @@ components:
         - token
         - refreshToken
         - sessionId
+
+    RefreshedTokens:
+      type: object
+      properties:
+        token:
+          type: string
+        refreshToken:
+          type: string
+      required:
+        - token
+        - refreshToken
 
     SessionCreate:
       type: object

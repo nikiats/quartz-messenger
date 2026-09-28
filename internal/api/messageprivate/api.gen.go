@@ -49,6 +49,21 @@ func (e Error401Code) Valid() bool {
 	}
 }
 
+// Defines values for Error500Code.
+const (
+	Error500CodeInternalError Error500Code = "internal_error"
+)
+
+// Valid indicates whether the value is a known member of the Error500Code enum.
+func (e Error500Code) Valid() bool {
+	switch e {
+	case Error500CodeInternalError:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for SentMessageResponseErrorCode.
 const (
 	SendFailed SentMessageResponseErrorCode = "send_failed"
@@ -103,12 +118,25 @@ type Error401 struct {
 // Error401Code Машиночитаемый код ошибки.
 type Error401Code string
 
+// Error500 defines model for Error500.
+type Error500 struct {
+	// Code Машиночитаемый код ошибки.
+	Code Error500Code `json:"code"`
+
+	// Message Описание ошибки.
+	Message string `json:"message"`
+}
+
+// Error500Code Машиночитаемый код ошибки.
+type Error500Code string
+
 // SendingMessage defines model for SendingMessage.
 type SendingMessage struct {
 	ChatId          openapi_types.UUID `json:"chatId"`
 	ClientMessageId openapi_types.UUID `json:"clientMessageId"`
 	Content         string             `json:"content"`
 	SenderId        openapi_types.UUID `json:"senderId"`
+	SessionId       openapi_types.UUID `json:"sessionId"`
 }
 
 // SentMessageResponse defines model for SentMessageResponse.
@@ -158,6 +186,9 @@ type ValidateResponseErrorCode string
 
 // BadRequest defines model for BadRequest.
 type BadRequest = Error400
+
+// InternalError defines model for InternalError.
+type InternalError = Error500
 
 // Unauthorized defines model for Unauthorized.
 type Unauthorized = Error401
@@ -513,6 +544,8 @@ type SendMessageResponse struct {
 	JSON400 *BadRequest
 	// JSON401 the response for an HTTP 401 `application/json` response
 	JSON401 *Unauthorized
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *InternalError
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -528,6 +561,11 @@ func (r SendMessageResponse) GetJSON400() *BadRequest {
 // GetJSON401 returns the response for an HTTP 401 `application/json` response
 func (r SendMessageResponse) GetJSON401() *Unauthorized {
 	return r.JSON401
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r SendMessageResponse) GetJSON500() *InternalError {
+	return r.JSON500
 }
 
 // GetBody returns the raw response body bytes
@@ -568,6 +606,8 @@ type ValidateSessionResponse struct {
 	JSON400 *BadRequest
 	// JSON401 the response for an HTTP 401 `application/json` response
 	JSON401 *Unauthorized
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *InternalError
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -583,6 +623,11 @@ func (r ValidateSessionResponse) GetJSON400() *BadRequest {
 // GetJSON401 returns the response for an HTTP 401 `application/json` response
 func (r ValidateSessionResponse) GetJSON401() *Unauthorized {
 	return r.JSON401
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r ValidateSessionResponse) GetJSON500() *InternalError {
+	return r.JSON500
 }
 
 // GetBody returns the raw response body bytes
@@ -705,6 +750,13 @@ func ParseSendMessageResponse(rsp *http.Response) (*SendMessageResponse, error) 
 		}
 		response.JSON401 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
 	}
 
 	return response, nil
@@ -744,6 +796,13 @@ func ParseValidateSessionResponse(rsp *http.Response) (*ValidateSessionResponse,
 			return nil, err
 		}
 		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
 
 	}
 
@@ -925,6 +984,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 
 type BadRequestJSONResponse Error400
 
+type InternalErrorJSONResponse Error500
+
 type UnauthorizedJSONResponse Error401
 
 type SendMessageRequestObject struct {
@@ -977,6 +1038,20 @@ func (response SendMessage401JSONResponse) VisitSendMessageResponse(w http.Respo
 	return err
 }
 
+type SendMessage500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response SendMessage500JSONResponse) VisitSendMessageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ValidateSessionRequestObject struct {
 	Body *ValidateSessionJSONRequestBody
 }
@@ -1023,6 +1098,20 @@ func (response ValidateSession401JSONResponse) VisitValidateSessionResponse(w ht
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ValidateSession500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response ValidateSession500JSONResponse) VisitValidateSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }

@@ -125,7 +125,7 @@ func (s *clientSession) run(ctx context.Context) {
 			return
 		}
 		if err := s.handle(ctx, data); err != nil {
-			s.Close(err.Error())
+			s.Close("error during message handling")
 			return
 		}
 
@@ -195,8 +195,17 @@ func (s *clientSession) handleAuthorize(ctx context.Context, req authorizeReques
 
 	s.userID = session.UserID
 	s.sessionID = session.SessionID
+
+	if !s.registry.Add(s) {
+		resp.Error = &errorStruct{
+			Message: "session was revoked",
+			Code:    codeSessionInvalid,
+		}
+		defer s.Close("auth error")
+		return s.send(ctx, resp)
+	}
+
 	s.setupSessionExpiry(session.ExpiresAt)
-	s.registry.Add(s)
 
 	resp.Success = true
 	return s.send(ctx, resp)
@@ -208,6 +217,7 @@ func (s *clientSession) handleSendMessage(ctx context.Context, req sendMessageRe
 	sent, err := s.messenger.SendMessage(ctx, messenger.Message{
 		ChatID:          req.ChatID,
 		SenderID:        s.userID,
+		SessionID:       s.sessionID,
 		ClientMessageID: req.ClientMessageID,
 		Content:         req.Message.Content,
 	})

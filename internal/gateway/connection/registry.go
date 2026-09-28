@@ -27,43 +27,71 @@ type Conn interface {
 type connSet map[Conn]struct{}
 
 type Registry struct {
-	mu        sync.RWMutex
-	byUser    map[uuid.UUID]connSet
-	bySession map[uuid.UUID]connSet
+	mu         sync.RWMutex
+	byUser     map[uuid.UUID]connSet
+	bySession  map[uuid.UUID]connSet
+	revoked    map[uuid.UUID]time.Time
+	sessionTTL time.Duration
 }
 
-func NewRegistry() *Registry {
+func NewRegistry(sessionTTL time.Duration) *Registry {
 	return &Registry{
-		byUser:    map[uuid.UUID]connSet{},
-		bySession: map[uuid.UUID]connSet{},
+		byUser:     map[uuid.UUID]connSet{},
+		bySession:  map[uuid.UUID]connSet{},
+		revoked:    map[uuid.UUID]time.Time{},
+		sessionTTL: sessionTTL,
 	}
 }
 
-func (r *Registry) Add(c Conn) {
+func (r *Registry) Add(conn Conn) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	add(r.byUser, c.UserID(), c)
-	add(r.bySession, c.SessionID(), c)
+	if _, ok := r.revoked[conn.SessionID()]; ok {
+		return false
+	}
+
+	add(r.byUser, conn.UserID(), conn)
+	add(r.bySession, conn.SessionID(), conn)
+	return true
 }
 
-func (r *Registry) Remove(c Conn) {
+func (r *Registry) Remove(conn Conn) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	removeConnection(r.byUser, c.UserID(), c)
-	removeConnection(r.bySession, c.SessionID(), c)
+	removeConnection(r.byUser, conn.UserID(), conn)
+	removeConnection(r.bySession, conn.SessionID(), conn)
 }
 
-func (r *Registry) Deliver(userID uuid.UUID, m Message) {
+func (r *Registry) Deliver(userID uuid.UUID, msg Message) {
 	for _, conn := range r.getConnections(r.byUser, userID) {
-		conn.Deliver(m)
+		conn.Deliver(msg)
 	}
 }
 
 func (r *Registry) CloseSession(sessionID uuid.UUID) {
-	for _, conn := range r.getConnections(r.bySession, sessionID) {
-		conn.Close("session revoked")
+	r.mu.Lock()
+
+	// очистка истекших сессий из списка отозванных
+	for id, expiry := range r.revoked {
+		if expiry.Before(time.Now()) {
+			delete(r.revoked, id)
+		}
+	}
+	r.revoked[sessionID] = time.Now().Add(r.sessionTTL)
+
+	// удаление соединений из регистра соединений
+	conns := slices.Collect(maps.Keys(r.bySession[sessionID]))
+	for _, conn := range conns {
+		removeConnection(r.byUser, conn.UserID(), conn)
+		removeConnection(r.bySession, sessionID, conn)
+	}
+
+	r.mu.Unlock()
+
+	for _, conn := range conns {
+		go conn.Close("session revoked")
 	}
 }
 

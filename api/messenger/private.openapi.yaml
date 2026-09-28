@@ -107,11 +107,15 @@ components:
         senderId:
           type: string
           format: uuid
+        sessionId:
+          type: string
+          format: uuid
       required:
         - content
         - clientMessageId
         - chatId
         - senderId
+        - sessionId
 
     SentMessageResponse:
       type: object

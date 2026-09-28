@@ -2,6 +2,7 @@ package http
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -37,23 +38,23 @@ func (s server) DeliverMessage(
 	_ context.Context,
 	req api.DeliverMessageRequestObject,
 ) (api.DeliverMessageResponseObject, error) {
-	m := req.Body
+	msg := req.Body
 
-	if !messageValid(m) {
+	if !validateReceivedMessage(msg) {
 		return api.DeliverMessage400JSONResponse{
 			BadRequestJSONResponse: api.BadRequestJSONResponse{
 				Code:    api.ValidationFailed,
-				Message: "required fields are missing",
+				Message: "invalid request",
 			},
 		}, nil
 	}
 
-	s.registry.Deliver(m.RecipientId, connection.Message{
-		ChatID:   m.ChatId,
-		SenderID: m.SenderId,
-		Seqnum:   m.Seqnum,
-		Content:  m.Content,
-		SentAt:   m.SentAt,
+	s.registry.Deliver(msg.RecipientId, connection.Message{
+		ChatID:   msg.ChatId,
+		SenderID: msg.SenderId,
+		Seqnum:   msg.Seqnum,
+		Content:  msg.Content,
+		SentAt:   msg.SentAt,
 	})
 
 	return api.DeliverMessage202Response{}, nil
@@ -68,22 +69,27 @@ func (s server) InvalidateSession(
 	return api.InvalidateSession204Response{}, nil
 }
 
-func messageValid(m *api.ReceivedMessage) bool {
-	return m.ChatId != uuid.Nil &&
-		m.SenderId != uuid.Nil &&
-		m.RecipientId != uuid.Nil &&
-		m.Content != "" &&
-		m.Seqnum > 0 &&
-		!m.SentAt.IsZero()
+func validateReceivedMessage(message *api.ReceivedMessage) bool {
+	if message.ChatId == uuid.Nil || message.SenderId == uuid.Nil || message.RecipientId == uuid.Nil {
+		return false
+	}
+	if len(message.Content) == 0 {
+		return false
+	}
+	if message.Seqnum <= 0 || message.SentAt.IsZero() {
+		return false
+	}
+	return true
 }
 
 func requireToken(token string, next http.Handler) http.Handler {
-	desiredHeader := "Bearer " + token
+	desiredHeader := []byte("Bearer " + token)
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		receivedHeader := r.Header.Get("Authorization")
+		receivedHeader := []byte(r.Header.Get("Authorization"))
 
-		if receivedHeader != desiredHeader {
+		// защита от атак по времени
+		if subtle.ConstantTimeCompare(receivedHeader, desiredHeader) != 1 {
 			writeError(w, http.StatusUnauthorized, api.InvalidToken, "invalid service token")
 			return
 		}
@@ -97,7 +103,7 @@ func badRequest(w http.ResponseWriter, _ *http.Request, err error) {
 }
 
 func internalError(w http.ResponseWriter, r *http.Request, err error) {
-	slog.Error("private api", "path", r.URL.Path, "error", err)
+	slog.Error("private api error", "path", r.URL.Path, "error", err)
 	writeError(w, http.StatusInternalServerError, api.Internal, "internal error")
 }
 
