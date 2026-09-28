@@ -100,15 +100,20 @@ components:
         recipientId:
           type: string
           format: uuid
-        content:
-          type: string
+        message:
+          type: object
+          properties:
+            content:
+              type: string
+          required:
+            - content
         sentAt:
           type: string
           format: "date-time"
       required:
         - chatId
         - seqnum
-        - content
+        - message
         - senderId
         - recipientId
         - sentAt
@@ -148,7 +153,7 @@ components:
           type: string
           description: "Машиночитаемый код ошибки."
           enum:
-            - internal_error
+            - internal
         message:
           type: string
           description: "Описание ошибки."

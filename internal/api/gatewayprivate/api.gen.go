@@ -20,49 +20,93 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
-// Defines values for ErrorCode.
+// Defines values for Error400Code.
 const (
-	Forbidden        ErrorCode = "forbidden"
-	Internal         ErrorCode = "internal"
-	InvalidToken     ErrorCode = "invalid_token"
-	NotFound         ErrorCode = "not_found"
-	ValidationFailed ErrorCode = "validation_failed"
+	InvalidRequest Error400Code = "invalid_request"
 )
 
-// Valid indicates whether the value is a known member of the ErrorCode enum.
-func (e ErrorCode) Valid() bool {
+// Valid indicates whether the value is a known member of the Error400Code enum.
+func (e Error400Code) Valid() bool {
 	switch e {
-	case Forbidden:
-		return true
-	case Internal:
-		return true
-	case InvalidToken:
-		return true
-	case NotFound:
-		return true
-	case ValidationFailed:
+	case InvalidRequest:
 		return true
 	default:
 		return false
 	}
 }
 
-// Error defines model for Error.
-type Error struct {
-	// Code Машиночитаемый код ошибки.
-	Code ErrorCode `json:"code"`
+// Defines values for Error401Code.
+const (
+	UnauthorizedRequest Error401Code = "unauthorized_request"
+)
 
-	// Message Описание для разработчика, не предназначенное для показа пользователю.
+// Valid indicates whether the value is a known member of the Error401Code enum.
+func (e Error401Code) Valid() bool {
+	switch e {
+	case UnauthorizedRequest:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for Error500Code.
+const (
+	Internal Error500Code = "internal"
+)
+
+// Valid indicates whether the value is a known member of the Error500Code enum.
+func (e Error500Code) Valid() bool {
+	switch e {
+	case Internal:
+		return true
+	default:
+		return false
+	}
+}
+
+// Error400 defines model for Error400.
+type Error400 struct {
+	// Code Машиночитаемый код ошибки.
+	Code Error400Code `json:"code"`
+
+	// Message Описание ошибки.
 	Message string `json:"message"`
 }
 
-// ErrorCode Машиночитаемый код ошибки.
-type ErrorCode string
+// Error400Code Машиночитаемый код ошибки.
+type Error400Code string
+
+// Error401 defines model for Error401.
+type Error401 struct {
+	// Code Машиночитаемый код ошибки.
+	Code Error401Code `json:"code"`
+
+	// Message Описание ошибки.
+	Message string `json:"message"`
+}
+
+// Error401Code Машиночитаемый код ошибки.
+type Error401Code string
+
+// Error500 defines model for Error500.
+type Error500 struct {
+	// Code Машиночитаемый код ошибки.
+	Code Error500Code `json:"code"`
+
+	// Message Описание ошибки.
+	Message string `json:"message"`
+}
+
+// Error500Code Машиночитаемый код ошибки.
+type Error500Code string
 
 // ReceivedMessage defines model for ReceivedMessage.
 type ReceivedMessage struct {
-	ChatId      openapi_types.UUID `json:"chatId"`
-	Content     string             `json:"content"`
+	ChatId  openapi_types.UUID `json:"chatId"`
+	Message struct {
+		Content string `json:"content"`
+	} `json:"message"`
 	RecipientId openapi_types.UUID `json:"recipientId"`
 	SenderId    openapi_types.UUID `json:"senderId"`
 	SentAt      time.Time          `json:"sentAt"`
@@ -70,10 +114,13 @@ type ReceivedMessage struct {
 }
 
 // BadRequest defines model for BadRequest.
-type BadRequest = Error
+type BadRequest = Error400
+
+// InternalError defines model for InternalError.
+type InternalError = Error500
 
 // Unauthorized defines model for Unauthorized.
-type Unauthorized = Error
+type Unauthorized = Error401
 
 // DeliverMessageJSONRequestBody defines body for DeliverMessage for application/json ContentType.
 type DeliverMessageJSONRequestBody = ReceivedMessage
@@ -154,12 +201,14 @@ type ClientInterface interface {
 
 	// InvalidateSession Разрыв соединений указанной сессии.
 	//
+	// Разрыв соединений указанной сессии. Сразу отмечает сессию как невалидную, не позволяя выполнять под ней действия.
+	//
 	// Corresponds with DELETE /connections/{sessionId} (the `InvalidateSession` operationId).
 	InvalidateSession(ctx context.Context, sessionId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DeliverMessageWithBody Доставка сообщения указанному пользователю.
 	//
-	// Доставка сообщения указанному пользователю. > Не стоит использовать данный запрос для отправки отправленного пользователем сообщения на его другие устройства (соединения). > Независимо от успешности доставки возвращает код 202.
+	// Доставка сообщения указанному пользователю. Не стоит использовать данный запрос для отправки отправленного пользователем сообщения на его другие устройства (соединения). Независимо от успешности доставки, возвращает код 202.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -168,7 +217,7 @@ type ClientInterface interface {
 
 	// DeliverMessage Доставка сообщения указанному пользователю.
 	//
-	// Доставка сообщения указанному пользователю. > Не стоит использовать данный запрос для отправки отправленного пользователем сообщения на его другие устройства (соединения). > Независимо от успешности доставки возвращает код 202.
+	// Доставка сообщения указанному пользователю. Не стоит использовать данный запрос для отправки отправленного пользователем сообщения на его другие устройства (соединения). Независимо от успешности доставки, возвращает код 202.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -177,6 +226,8 @@ type ClientInterface interface {
 }
 
 // InvalidateSession Разрыв соединений указанной сессии.
+//
+// Разрыв соединений указанной сессии. Сразу отмечает сессию как невалидную, не позволяя выполнять под ней действия.
 //
 // Corresponds with DELETE /connections/{sessionId} (the `InvalidateSession` operationId).
 func (c *Client) InvalidateSession(ctx context.Context, sessionId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -193,7 +244,7 @@ func (c *Client) InvalidateSession(ctx context.Context, sessionId openapi_types.
 
 // DeliverMessageWithBody Доставка сообщения указанному пользователю.
 //
-// Доставка сообщения указанному пользователю. > Не стоит использовать данный запрос для отправки отправленного пользователем сообщения на его другие устройства (соединения). > Независимо от успешности доставки возвращает код 202.
+// Доставка сообщения указанному пользователю. Не стоит использовать данный запрос для отправки отправленного пользователем сообщения на его другие устройства (соединения). Независимо от успешности доставки, возвращает код 202.
 //
 // Takes any type of body and a specified content type.
 //
@@ -212,7 +263,7 @@ func (c *Client) DeliverMessageWithBody(ctx context.Context, contentType string,
 
 // DeliverMessage Доставка сообщения указанному пользователю.
 //
-// Доставка сообщения указанному пользователю. > Не стоит использовать данный запрос для отправки отправленного пользователем сообщения на его другие устройства (соединения). > Независимо от успешности доставки возвращает код 202.
+// Доставка сообщения указанному пользователю. Не стоит использовать данный запрос для отправки отправленного пользователем сообщения на его другие устройства (соединения). Независимо от успешности доставки, возвращает код 202.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -349,6 +400,8 @@ type ClientWithResponsesInterface interface {
 
 	// InvalidateSessionWithResponse Разрыв соединений указанной сессии.
 	//
+	// Разрыв соединений указанной сессии. Сразу отмечает сессию как невалидную, не позволяя выполнять под ней действия.
+	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with DELETE /connections/{sessionId} (the `InvalidateSession` operationId).
@@ -356,7 +409,7 @@ type ClientWithResponsesInterface interface {
 
 	// DeliverMessageWithBodyWithResponse Доставка сообщения указанному пользователю.
 	//
-	// Доставка сообщения указанному пользователю. > Не стоит использовать данный запрос для отправки отправленного пользователем сообщения на его другие устройства (соединения). > Независимо от успешности доставки возвращает код 202.
+	// Доставка сообщения указанному пользователю. Не стоит использовать данный запрос для отправки отправленного пользователем сообщения на его другие устройства (соединения). Независимо от успешности доставки, возвращает код 202.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -365,7 +418,7 @@ type ClientWithResponsesInterface interface {
 
 	// DeliverMessageWithResponse Доставка сообщения указанному пользователю.
 	//
-	// Доставка сообщения указанному пользователю. > Не стоит использовать данный запрос для отправки отправленного пользователем сообщения на его другие устройства (соединения). > Независимо от успешности доставки возвращает код 202.
+	// Доставка сообщения указанному пользователю. Не стоит использовать данный запрос для отправки отправленного пользователем сообщения на его другие устройства (соединения). Независимо от успешности доставки, возвращает код 202.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -376,13 +429,27 @@ type ClientWithResponsesInterface interface {
 type InvalidateSessionResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *BadRequest
 	// JSON401 the response for an HTTP 401 `application/json` response
 	JSON401 *Unauthorized
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *InternalError
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r InvalidateSessionResponse) GetJSON400() *BadRequest {
+	return r.JSON400
 }
 
 // GetJSON401 returns the response for an HTTP 401 `application/json` response
 func (r InvalidateSessionResponse) GetJSON401() *Unauthorized {
 	return r.JSON401
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r InvalidateSessionResponse) GetJSON500() *InternalError {
+	return r.JSON500
 }
 
 // GetBody returns the raw response body bytes
@@ -421,6 +488,8 @@ type DeliverMessageResponse struct {
 	JSON400 *BadRequest
 	// JSON401 the response for an HTTP 401 `application/json` response
 	JSON401 *Unauthorized
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *InternalError
 }
 
 // GetJSON400 returns the response for an HTTP 400 `application/json` response
@@ -431,6 +500,11 @@ func (r DeliverMessageResponse) GetJSON400() *BadRequest {
 // GetJSON401 returns the response for an HTTP 401 `application/json` response
 func (r DeliverMessageResponse) GetJSON401() *Unauthorized {
 	return r.JSON401
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r DeliverMessageResponse) GetJSON500() *InternalError {
+	return r.JSON500
 }
 
 // GetBody returns the raw response body bytes
@@ -464,6 +538,8 @@ func (r DeliverMessageResponse) ContentType() string {
 
 // InvalidateSessionWithResponse Разрыв соединений указанной сессии.
 //
+// Разрыв соединений указанной сессии. Сразу отмечает сессию как невалидную, не позволяя выполнять под ней действия.
+//
 // Returns a wrapper object for the known response body format(s).
 //
 // Corresponds with DELETE /connections/{sessionId} (the `InvalidateSession` operationId).
@@ -477,7 +553,7 @@ func (c *ClientWithResponses) InvalidateSessionWithResponse(ctx context.Context,
 
 // DeliverMessageWithBodyWithResponse Доставка сообщения указанному пользователю.
 //
-// Доставка сообщения указанному пользователю. > Не стоит использовать данный запрос для отправки отправленного пользователем сообщения на его другие устройства (соединения). > Независимо от успешности доставки возвращает код 202.
+// Доставка сообщения указанному пользователю. Не стоит использовать данный запрос для отправки отправленного пользователем сообщения на его другие устройства (соединения). Независимо от успешности доставки, возвращает код 202.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -492,7 +568,7 @@ func (c *ClientWithResponses) DeliverMessageWithBodyWithResponse(ctx context.Con
 
 // DeliverMessageWithResponse Доставка сообщения указанному пользователю.
 //
-// Доставка сообщения указанному пользователю. > Не стоит использовать данный запрос для отправки отправленного пользователем сообщения на его другие устройства (соединения). > Независимо от успешности доставки возвращает код 202.
+// Доставка сообщения указанному пользователю. Не стоит использовать данный запрос для отправки отправленного пользователем сообщения на его другие устройства (соединения). Независимо от успешности доставки, возвращает код 202.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -522,12 +598,26 @@ func ParseInvalidateSessionResponse(rsp *http.Response) (*InvalidateSessionRespo
 	case rsp.StatusCode == 204:
 		break // No content-type
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest Unauthorized
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
 
 	}
 
@@ -564,6 +654,13 @@ func ParseDeliverMessageResponse(rsp *http.Response) (*DeliverMessageResponse, e
 			return nil, err
 		}
 		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
 
 	}
 
@@ -755,9 +852,11 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	return m
 }
 
-type BadRequestJSONResponse Error
+type BadRequestJSONResponse Error400
 
-type UnauthorizedJSONResponse Error
+type InternalErrorJSONResponse Error500
+
+type UnauthorizedJSONResponse Error401
 
 type InvalidateSessionRequestObject struct {
 	SessionId openapi_types.UUID `json:"sessionId"`
@@ -775,6 +874,20 @@ func (response InvalidateSession204Response) VisitInvalidateSessionResponse(w ht
 	return nil
 }
 
+type InvalidateSession400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response InvalidateSession400JSONResponse) VisitInvalidateSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type InvalidateSession401JSONResponse struct{ UnauthorizedJSONResponse }
 
 func (response InvalidateSession401JSONResponse) VisitInvalidateSessionResponse(w http.ResponseWriter) error {
@@ -785,6 +898,20 @@ func (response InvalidateSession401JSONResponse) VisitInvalidateSessionResponse(
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type InvalidateSession500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response InvalidateSession500JSONResponse) VisitInvalidateSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -829,6 +956,20 @@ func (response DeliverMessage401JSONResponse) VisitDeliverMessageResponse(w http
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeliverMessage500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response DeliverMessage500JSONResponse) VisitDeliverMessageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }

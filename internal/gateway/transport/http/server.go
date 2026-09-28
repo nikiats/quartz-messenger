@@ -43,7 +43,7 @@ func (s server) DeliverMessage(
 	if !validateReceivedMessage(msg) {
 		return api.DeliverMessage400JSONResponse{
 			BadRequestJSONResponse: api.BadRequestJSONResponse{
-				Code:    api.ValidationFailed,
+				Code:    api.InvalidRequest,
 				Message: "invalid request",
 			},
 		}, nil
@@ -53,7 +53,7 @@ func (s server) DeliverMessage(
 		ChatID:   msg.ChatId,
 		SenderID: msg.SenderId,
 		Seqnum:   msg.Seqnum,
-		Content:  msg.Content,
+		Content:  msg.Message.Content,
 		SentAt:   msg.SentAt,
 	})
 
@@ -73,7 +73,7 @@ func validateReceivedMessage(message *api.ReceivedMessage) bool {
 	if message.ChatId == uuid.Nil || message.SenderId == uuid.Nil || message.RecipientId == uuid.Nil {
 		return false
 	}
-	if len(message.Content) == 0 {
+	if len(message.Message.Content) == 0 {
 		return false
 	}
 	if message.Seqnum <= 0 || message.SentAt.IsZero() {
@@ -90,7 +90,7 @@ func requireToken(token string, next http.Handler) http.Handler {
 
 		// защита от атак по времени
 		if subtle.ConstantTimeCompare(receivedHeader, desiredHeader) != 1 {
-			writeError(w, http.StatusUnauthorized, api.InvalidToken, "invalid service token")
+			unauthorizedRequest(w)
 			return
 		}
 
@@ -99,7 +99,11 @@ func requireToken(token string, next http.Handler) http.Handler {
 }
 
 func badRequest(w http.ResponseWriter, _ *http.Request, err error) {
-	writeError(w, http.StatusBadRequest, api.ValidationFailed, err.Error())
+	writeError(w, http.StatusBadRequest, api.InvalidRequest, err.Error())
+}
+
+func unauthorizedRequest(w http.ResponseWriter) {
+	writeError(w, http.StatusUnauthorized, api.UnauthorizedRequest, "unauthorized")
 }
 
 func internalError(w http.ResponseWriter, r *http.Request, err error) {
@@ -107,9 +111,22 @@ func internalError(w http.ResponseWriter, r *http.Request, err error) {
 	writeError(w, http.StatusInternalServerError, api.Internal, "internal error")
 }
 
-func writeError(w http.ResponseWriter, status int, code api.ErrorCode, message string) {
+func writeError(w http.ResponseWriter, status int, code any, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 
-	_ = json.NewEncoder(w).Encode(api.Error{Code: code, Message: message})
+	switch code := code.(type) {
+	case api.Error401Code:
+		_ = json.NewEncoder(w).Encode(
+			api.Error401{Code: code, Message: message},
+		)
+	case api.Error500Code:
+		_ = json.NewEncoder(w).Encode(
+			api.Error500{Code: code, Message: message},
+		)
+	case api.Error400Code:
+		_ = json.NewEncoder(w).Encode(
+			api.Error400{Code: code, Message: message},
+		)
+	}
 }
