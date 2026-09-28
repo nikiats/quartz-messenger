@@ -236,7 +236,7 @@ components:
           type: string
           description: "Машиночитаемый код ошибки."
           enum:
-            - internal_error
+            - internal
         message:
           type: string
           description: "Описание ошибки."

@@ -111,22 +111,12 @@ func internalError(w http.ResponseWriter, r *http.Request, err error) {
 	writeError(w, http.StatusInternalServerError, api.Internal, "internal error")
 }
 
-func writeError(w http.ResponseWriter, status int, code any, message string) {
+func writeError[C ~string](w http.ResponseWriter, status int, code C, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 
-	switch code := code.(type) {
-	case api.Error401Code:
-		_ = json.NewEncoder(w).Encode(
-			api.Error401{Code: code, Message: message},
-		)
-	case api.Error500Code:
-		_ = json.NewEncoder(w).Encode(
-			api.Error500{Code: code, Message: message},
-		)
-	case api.Error400Code:
-		_ = json.NewEncoder(w).Encode(
-			api.Error400{Code: code, Message: message},
-		)
-	}
+	_ = json.NewEncoder(w).Encode(struct {
+		Code    C      `json:"code"`
+		Message string `json:"message"`
+	}{code, message})
 }

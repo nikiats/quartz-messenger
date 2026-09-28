@@ -17,3 +17,10 @@ type Message struct {
 	SentAt   time.Time
 	Message  MessageContent
 }
+
+type MessageQuery struct {
+	Before *int64
+	After  *int64
+	Limit  int
+	Search string
+}

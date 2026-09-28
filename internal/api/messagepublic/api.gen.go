@@ -60,42 +60,105 @@ func (e ChatCreateType) Valid() bool {
 	}
 }
 
-// Defines values for ErrorCode.
+// Defines values for Error400Code.
 const (
-	ErrorCodeAlreadyMember      ErrorCode = "already_member"
-	ErrorCodeForbidden          ErrorCode = "forbidden"
-	ErrorCodeInternal           ErrorCode = "internal"
-	ErrorCodeInvalidCredentials ErrorCode = "invalid_credentials"
-	ErrorCodeInvalidToken       ErrorCode = "invalid_token"
-	ErrorCodeLoginTaken         ErrorCode = "login_taken"
-	ErrorCodeNotFound           ErrorCode = "not_found"
-	ErrorCodeSuspendedUser      ErrorCode = "suspended_user"
-	ErrorCodeUsernameTaken      ErrorCode = "username_taken"
-	ErrorCodeValidationFailed   ErrorCode = "validation_failed"
+	InvalidRequest Error400Code = "invalid_request"
 )
 
-// Valid indicates whether the value is a known member of the ErrorCode enum.
-func (e ErrorCode) Valid() bool {
+// Valid indicates whether the value is a known member of the Error400Code enum.
+func (e Error400Code) Valid() bool {
 	switch e {
-	case ErrorCodeAlreadyMember:
+	case InvalidRequest:
 		return true
-	case ErrorCodeForbidden:
+	default:
+		return false
+	}
+}
+
+// Defines values for Error401Code.
+const (
+	Error401CodeInvalidCredentials Error401Code = "invalid_credentials"
+	Error401CodeInvalidToken       Error401Code = "invalid_token"
+	Error401CodeUnauthorized       Error401Code = "unauthorized"
+)
+
+// Valid indicates whether the value is a known member of the Error401Code enum.
+func (e Error401Code) Valid() bool {
+	switch e {
+	case Error401CodeInvalidCredentials:
 		return true
-	case ErrorCodeInternal:
+	case Error401CodeInvalidToken:
 		return true
-	case ErrorCodeInvalidCredentials:
+	case Error401CodeUnauthorized:
 		return true
-	case ErrorCodeInvalidToken:
+	default:
+		return false
+	}
+}
+
+// Defines values for Error403Code.
+const (
+	Error403CodeForbidden     Error403Code = "forbidden"
+	Error403CodeSuspendedUser Error403Code = "suspended_user"
+)
+
+// Valid indicates whether the value is a known member of the Error403Code enum.
+func (e Error403Code) Valid() bool {
+	switch e {
+	case Error403CodeForbidden:
 		return true
-	case ErrorCodeLoginTaken:
+	case Error403CodeSuspendedUser:
 		return true
-	case ErrorCodeNotFound:
+	default:
+		return false
+	}
+}
+
+// Defines values for Error404Code.
+const (
+	Error404CodeNotFound Error404Code = "not_found"
+)
+
+// Valid indicates whether the value is a known member of the Error404Code enum.
+func (e Error404Code) Valid() bool {
+	switch e {
+	case Error404CodeNotFound:
 		return true
-	case ErrorCodeSuspendedUser:
+	default:
+		return false
+	}
+}
+
+// Defines values for Error409Code.
+const (
+	AlreadyMember Error409Code = "already_member"
+	LoginTaken    Error409Code = "login_taken"
+	UsernameTaken Error409Code = "username_taken"
+)
+
+// Valid indicates whether the value is a known member of the Error409Code enum.
+func (e Error409Code) Valid() bool {
+	switch e {
+	case AlreadyMember:
 		return true
-	case ErrorCodeUsernameTaken:
+	case LoginTaken:
 		return true
-	case ErrorCodeValidationFailed:
+	case UsernameTaken:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for Error500Code.
+const (
+	Internal Error500Code = "internal"
+)
+
+// Valid indicates whether the value is a known member of the Error500Code enum.
+func (e Error500Code) Valid() bool {
+	switch e {
+	case Internal:
 		return true
 	default:
 		return false
@@ -147,17 +210,77 @@ type ChatCreate struct {
 // ChatCreateType defines model for ChatCreate.Type.
 type ChatCreateType string
 
-// Error defines model for Error.
-type Error struct {
+// Error400 defines model for Error400.
+type Error400 struct {
 	// Code Машиночитаемый код ошибки.
-	Code ErrorCode `json:"code"`
+	Code Error400Code `json:"code"`
 
-	// Message Описание для разработчика, не предназначенное для показа пользователю.
+	// Message Описание ошибки.
 	Message string `json:"message"`
 }
 
-// ErrorCode Машиночитаемый код ошибки.
-type ErrorCode string
+// Error400Code Машиночитаемый код ошибки.
+type Error400Code string
+
+// Error401 defines model for Error401.
+type Error401 struct {
+	// Code Машиночитаемый код ошибки.
+	Code Error401Code `json:"code"`
+
+	// Message Описание ошибки.
+	Message string `json:"message"`
+}
+
+// Error401Code Машиночитаемый код ошибки.
+type Error401Code string
+
+// Error403 defines model for Error403.
+type Error403 struct {
+	// Code Машиночитаемый код ошибки.
+	Code Error403Code `json:"code"`
+
+	// Message Описание ошибки.
+	Message string `json:"message"`
+}
+
+// Error403Code Машиночитаемый код ошибки.
+type Error403Code string
+
+// Error404 defines model for Error404.
+type Error404 struct {
+	// Code Машиночитаемый код ошибки.
+	Code Error404Code `json:"code"`
+
+	// Message Описание ошибки.
+	Message string `json:"message"`
+}
+
+// Error404Code Машиночитаемый код ошибки.
+type Error404Code string
+
+// Error409 defines model for Error409.
+type Error409 struct {
+	// Code Машиночитаемый код ошибки.
+	Code Error409Code `json:"code"`
+
+	// Message Описание ошибки.
+	Message string `json:"message"`
+}
+
+// Error409Code Машиночитаемый код ошибки.
+type Error409Code string
+
+// Error500 defines model for Error500.
+type Error500 struct {
+	// Code Машиночитаемый код ошибки.
+	Code Error500Code `json:"code"`
+
+	// Message Описание ошибки.
+	Message string `json:"message"`
+}
+
+// Error500Code Машиночитаемый код ошибки.
+type Error500Code string
 
 // Member defines model for Member.
 type Member struct {
@@ -235,19 +358,22 @@ type UserCreate struct {
 type UserSearchResponse = []User
 
 // BadRequest defines model for BadRequest.
-type BadRequest = Error
+type BadRequest = Error400
 
 // Conflict defines model for Conflict.
-type Conflict = Error
+type Conflict = Error409
 
 // Forbidden defines model for Forbidden.
-type Forbidden = Error
+type Forbidden = Error403
+
+// InternalError defines model for InternalError.
+type InternalError = Error500
 
 // NotFound defines model for NotFound.
-type NotFound = Error
+type NotFound = Error404
 
 // Unauthorized defines model for Unauthorized.
-type Unauthorized = Error
+type Unauthorized = Error401
 
 // GetMessagesParams defines parameters for GetMessages.
 type GetMessagesParams struct {
@@ -901,15 +1027,17 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	return m
 }
 
-type BadRequestJSONResponse Error
+type BadRequestJSONResponse Error400
 
-type ConflictJSONResponse Error
+type ConflictJSONResponse Error409
 
-type ForbiddenJSONResponse Error
+type ForbiddenJSONResponse Error403
 
-type NotFoundJSONResponse Error
+type InternalErrorJSONResponse Error500
 
-type UnauthorizedJSONResponse Error
+type NotFoundJSONResponse Error404
+
+type UnauthorizedJSONResponse Error401
 
 type GetChatsRequestObject struct {
 }
@@ -942,6 +1070,20 @@ func (response GetChats401JSONResponse) VisitGetChatsResponse(w http.ResponseWri
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetChats500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response GetChats500JSONResponse) VisitGetChatsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -1024,6 +1166,20 @@ func (response CreateChat404JSONResponse) VisitCreateChatResponse(w http.Respons
 	return err
 }
 
+type CreateChat500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response CreateChat500JSONResponse) VisitCreateChatResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type DeleteChatRequestObject struct {
 	Id openapi_types.UUID `json:"id"`
 }
@@ -1082,6 +1238,20 @@ func (response DeleteChat404JSONResponse) VisitDeleteChatResponse(w http.Respons
 	return err
 }
 
+type DeleteChat500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response DeleteChat500JSONResponse) VisitDeleteChatResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetChatInfoRequestObject struct {
 	Id openapi_types.UUID `json:"id"`
 }
@@ -1132,6 +1302,20 @@ func (response GetChatInfo404JSONResponse) VisitGetChatInfoResponse(w http.Respo
 	return err
 }
 
+type GetChatInfo500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response GetChatInfo500JSONResponse) VisitGetChatInfoResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetChatMembersRequestObject struct {
 	Id openapi_types.UUID `json:"id"`
 }
@@ -1178,6 +1362,20 @@ func (response GetChatMembers404JSONResponse) VisitGetChatMembersResponse(w http
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetChatMembers500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response GetChatMembers500JSONResponse) VisitGetChatMembersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -1241,7 +1439,7 @@ func (response AddChatMember403JSONResponse) VisitAddChatMemberResponse(w http.R
 	return err
 }
 
-type AddChatMember404JSONResponse Error
+type AddChatMember404JSONResponse Error404
 
 func (response AddChatMember404JSONResponse) VisitAddChatMemberResponse(w http.ResponseWriter) error {
 
@@ -1255,7 +1453,7 @@ func (response AddChatMember404JSONResponse) VisitAddChatMemberResponse(w http.R
 	return err
 }
 
-type AddChatMember409JSONResponse Error
+type AddChatMember409JSONResponse Error409
 
 func (response AddChatMember409JSONResponse) VisitAddChatMemberResponse(w http.ResponseWriter) error {
 
@@ -1265,6 +1463,20 @@ func (response AddChatMember409JSONResponse) VisitAddChatMemberResponse(w http.R
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddChatMember500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response AddChatMember500JSONResponse) VisitAddChatMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -1324,6 +1536,20 @@ func (response DeleteChatMember404JSONResponse) VisitDeleteChatMemberResponse(w 
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteChatMember500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response DeleteChatMember500JSONResponse) VisitDeleteChatMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -1396,6 +1622,20 @@ func (response GetMessages404JSONResponse) VisitGetMessagesResponse(w http.Respo
 	return err
 }
 
+type GetMessages500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response GetMessages500JSONResponse) VisitGetMessagesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type SendMessageRequestObject struct {
 	Id   openapi_types.UUID `json:"id"`
 	Body *SendMessageJSONRequestBody
@@ -1461,6 +1701,20 @@ func (response SendMessage404JSONResponse) VisitSendMessageResponse(w http.Respo
 	return err
 }
 
+type SendMessage500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response SendMessage500JSONResponse) VisitSendMessageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type EditProfileRequestObject struct {
 	Body *EditProfileJSONRequestBody
 }
@@ -1515,6 +1769,20 @@ func (response EditProfile409JSONResponse) VisitEditProfileResponse(w http.Respo
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type EditProfile500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response EditProfile500JSONResponse) VisitEditProfileResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -1583,6 +1851,20 @@ func (response LoginSession403JSONResponse) VisitLoginSessionResponse(w http.Res
 	return err
 }
 
+type LoginSession500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response LoginSession500JSONResponse) VisitLoginSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type InvalidateSessionRequestObject struct {
 	Id openapi_types.UUID `json:"id"`
 }
@@ -1623,6 +1905,20 @@ func (response InvalidateSession404JSONResponse) VisitInvalidateSessionResponse(
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type InvalidateSession500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response InvalidateSession500JSONResponse) VisitInvalidateSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -1677,6 +1973,20 @@ func (response RefreshToken401JSONResponse) VisitRefreshTokenResponse(w http.Res
 	return err
 }
 
+type RefreshToken500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response RefreshToken500JSONResponse) VisitRefreshTokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type SearchUsersRequestObject struct {
 	Params SearchUsersParams
 }
@@ -1727,6 +2037,20 @@ func (response SearchUsers401JSONResponse) VisitSearchUsersResponse(w http.Respo
 	return err
 }
 
+type SearchUsers500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response SearchUsers500JSONResponse) VisitSearchUsersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type RegisterUserRequestObject struct {
 	Body *RegisterUserJSONRequestBody
 }
@@ -1767,6 +2091,20 @@ func (response RegisterUser409JSONResponse) VisitRegisterUserResponse(w http.Res
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RegisterUser500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response RegisterUser500JSONResponse) VisitRegisterUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -1817,6 +2155,20 @@ func (response GetUserInfo404JSONResponse) VisitGetUserInfoResponse(w http.Respo
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetUserInfo500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response GetUserInfo500JSONResponse) VisitGetUserInfoResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -2372,68 +2724,69 @@ func (sh *strictHandler) GetUserInfo(w http.ResponseWriter, r *http.Request, id 
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
+	"q2v82dw6evzDLObXfND8bwAAAP//",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

@@ -1,7 +1,7 @@
 openapi: 3.0.0
 info:
   title: Взаимодействие клиента с сервисом мессенджера
-  description: "Клиентские запросы к сервису мессенджера. Любой запрос может ответить 500 с телом Error. При отсутствии у пользователя принадлежности к ресурсу, возвращается код 404 во избежание раскрытия существования ресурсов с данным идентификатором."
+  description: "Клиентские запросы к сервису мессенджера. При отсутствии у пользователя принадлежности к ресурсу, возвращается код 404 во избежание раскрытия существования ресурсов с данным идентификатором."
   version: 1.0.0
 
 tags:
@@ -36,6 +36,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "409":
           $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalError"
     get:
       operationId: searchUsers
       tags:
@@ -58,6 +60,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /users/{id}:
     get:
       operationId: getUserInfo
@@ -83,6 +87,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /sessions:
     post:
       operationId: loginSession
@@ -111,6 +117,8 @@ paths:
         "403":
           description: "Действие аккаунта пользователя было приостановлено."
           $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /tokens:
     post:
       operationId: refreshToken
@@ -136,6 +144,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /sessions/{id}:
     delete:
       operationId: invalidateSession
@@ -157,6 +167,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /profile:
     patch:
       operationId: editProfile
@@ -179,6 +191,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "409":
           $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /chats:
     get:
       operationId: getChats
@@ -197,6 +211,8 @@ paths:
                   $ref: "#/components/schemas/Chat"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
     post:
       operationId: createChat
       tags:
@@ -228,6 +244,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /chats/{id}:
     get:
       operationId: getChatInfo
@@ -253,6 +271,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
     delete:
       operationId: deleteChat
       tags:
@@ -275,6 +295,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /chats/{id}/messages:
     get:
       operationId: getMessages
@@ -336,6 +358,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
     post:
       operationId: sendMessage
       tags:
@@ -370,6 +394,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /chats/{id}/members:
     get:
       operationId: getChatMembers
@@ -397,6 +423,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
     post:
       operationId: addChatMember
       tags:
@@ -430,13 +458,15 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Error"
+                $ref: "#/components/schemas/Error404"
         "409":
           description: "Пользователь уже является участником чата (already_member)."
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Error"
+                $ref: "#/components/schemas/Error409"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /chats/{id}/members/{userId}:
     delete:
       operationId: deleteChatMember
@@ -466,6 +496,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
 
 components:
   securitySchemes:
@@ -478,31 +510,37 @@ components:
       content:
         application/json:
           schema:
-            $ref: "#/components/schemas/Error"
+            $ref: "#/components/schemas/Error400"
     Unauthorized:
       description: "Требуется авторизация."
       content:
         application/json:
           schema:
-            $ref: "#/components/schemas/Error"
+            $ref: "#/components/schemas/Error401"
     Forbidden:
       description: "Недостаточно прав."
       content:
         application/json:
           schema:
-            $ref: "#/components/schemas/Error"
+            $ref: "#/components/schemas/Error403"
     NotFound:
       description: "Ресурс отсутствует."
       content:
         application/json:
           schema:
-            $ref: "#/components/schemas/Error"
+            $ref: "#/components/schemas/Error404"
     Conflict:
       description: "Конфликт с текущим состоянием."
       content:
         application/json:
           schema:
-            $ref: "#/components/schemas/Error"
+            $ref: "#/components/schemas/Error409"
+    InternalError:
+      description: "Внутренняя ошибка."
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error500"
   schemas:
     UserCreate:
       type: object
@@ -702,26 +740,92 @@ components:
       items:
         $ref: "#/components/schemas/User"
 
-    Error:
+    Error400:
       type: object
       properties:
         code:
           type: string
           description: "Машиночитаемый код ошибки."
           enum:
-            - validation_failed
+            - invalid_request
+        message:
+          type: string
+          description: "Описание ошибки."
+      required:
+        - code
+        - message
+    Error401:
+      type: object
+      properties:
+        code:
+          type: string
+          description: "Машиночитаемый код ошибки."
+          enum:
             - invalid_credentials
             - invalid_token
+            - unauthorized
+        message:
+          type: string
+          description: "Описание ошибки."
+      required:
+        - code
+        - message
+    Error403:
+      type: object
+      properties:
+        code:
+          type: string
+          description: "Машиночитаемый код ошибки."
+          enum:
             - forbidden
+            - suspended_user
+        message:
+          type: string
+          description: "Описание ошибки."
+      required:
+        - code
+        - message
+    Error404:
+      type: object
+      properties:
+        code:
+          type: string
+          description: "Машиночитаемый код ошибки."
+          enum:
             - not_found
+        message:
+          type: string
+          description: "Описание ошибки."
+      required:
+        - code
+        - message
+    Error409:
+      type: object
+      properties:
+        code:
+          type: string
+          description: "Машиночитаемый код ошибки."
+          enum:
             - login_taken
             - username_taken
             - already_member
-            - suspended_user
+        message:
+          type: string
+          description: "Описание ошибки."
+      required:
+        - code
+        - message
+    Error500:
+      type: object
+      properties:
+        code:
+          type: string
+          description: "Машиночитаемый код ошибки."
+          enum:
             - internal
         message:
           type: string
-          description: "Описание для разработчика, не предназначенное для показа пользователю."
+          description: "Описание ошибки."
       required:
         - code
         - message

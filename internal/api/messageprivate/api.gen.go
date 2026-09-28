@@ -51,13 +51,13 @@ func (e Error401Code) Valid() bool {
 
 // Defines values for Error500Code.
 const (
-	Error500CodeInternalError Error500Code = "internal_error"
+	Internal Error500Code = "internal"
 )
 
 // Valid indicates whether the value is a known member of the Error500Code enum.
 func (e Error500Code) Valid() bool {
 	switch e {
-	case Error500CodeInternalError:
+	case Internal:
 		return true
 	default:
 		return false
