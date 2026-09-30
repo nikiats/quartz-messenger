@@ -81,13 +81,22 @@ func (e SendMessageErrorCode) Valid() bool {
 
 // Defines values for ValidateSessionErrorCode.
 const (
-	InvalidToken ValidateSessionErrorCode = "invalid_token"
+	AuthorizationFailed ValidateSessionErrorCode = "authorization_failed"
+	SessionExpired      ValidateSessionErrorCode = "session_expired"
+	SessionRevoked      ValidateSessionErrorCode = "session_revoked"
+	SuspendedUser       ValidateSessionErrorCode = "suspended_user"
 )
 
 // Valid indicates whether the value is a known member of the ValidateSessionErrorCode enum.
 func (e ValidateSessionErrorCode) Valid() bool {
 	switch e {
-	case InvalidToken:
+	case AuthorizationFailed:
+		return true
+	case SessionExpired:
+		return true
+	case SessionRevoked:
+		return true
+	case SuspendedUser:
 		return true
 	default:
 		return false

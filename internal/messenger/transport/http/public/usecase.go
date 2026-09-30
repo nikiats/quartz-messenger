@@ -51,6 +51,6 @@ type Messages interface {
 		ctx context.Context,
 		session domain.Session,
 		chatID, clientMessageID uuid.UUID,
-		content string,
+		content domain.MessageContent,
 	) (domain.Message, error)
 }

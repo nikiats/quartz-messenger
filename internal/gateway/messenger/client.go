@@ -96,9 +96,9 @@ func (c *Client) SendMessage(ctx context.Context, message Message) (Sent, error)
 		ChatId:          message.ChatID,
 		SenderId:        message.SenderID,
 		ClientMessageId: message.ClientMessageID,
-		Content: struct {
-			Text string `json:"text"`
-		}{message.Content.Text},
+		Content: messageprivate.MessageContent{
+			Text: message.Content.Text,
+		},
 		SessionId: message.SessionID,
 	}
 

@@ -106,7 +106,7 @@ func unauthorizedRequest(w http.ResponseWriter) {
 }
 
 func internalError(w http.ResponseWriter, r *http.Request, err error) {
-	slog.Error("private api error", "path", r.URL.Path, "error", err)
+	slog.Error("private API error", "path", r.URL.Path, "error", err)
 	writeError(w, http.StatusInternalServerError, api.Internal, "internal error")
 }
 

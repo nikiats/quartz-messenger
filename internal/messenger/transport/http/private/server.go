@@ -99,7 +99,7 @@ func (s server) ValidateSession(ctx context.Context, req api.ValidateSessionRequ
 		return api.ValidateSession200JSONResponse{
 			Success: false,
 			Error: &api.ValidateSessionError{
-				Code:    api.InvalidToken,
+				Code:    api.AuthorizationFailed,
 				Message: "token invalid",
 			},
 		}, nil
@@ -107,7 +107,7 @@ func (s server) ValidateSession(ctx context.Context, req api.ValidateSessionRequ
 		return api.ValidateSession200JSONResponse{
 			Success: false,
 			Error: &api.ValidateSessionError{
-				Code:    api.InvalidToken,
+				Code:    api.SessionExpired,
 				Message: "token expired",
 			},
 		}, nil
@@ -115,7 +115,15 @@ func (s server) ValidateSession(ctx context.Context, req api.ValidateSessionRequ
 		return api.ValidateSession200JSONResponse{
 			Success: false,
 			Error: &api.ValidateSessionError{
-				Code:    api.InvalidToken,
+				Code:    api.SessionRevoked,
+				Message: "session revoked",
+			},
+		}, nil
+	case errors.Is(err, domain.ErrSuspendedUser):
+		return api.ValidateSession200JSONResponse{
+			Success: false,
+			Error: &api.ValidateSessionError{
+				Code:    api.SuspendedUser,
 				Message: "session revoked",
 			},
 		}, nil

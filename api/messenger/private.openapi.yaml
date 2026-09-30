@@ -53,7 +53,7 @@ paths:
               $ref: "#/components/schemas/TokenValidate"
       responses:
         "200":
-          description: "Сессия валидна."
+          description: "Результат валидации сессии."
           content:
             application/json:
               schema:
@@ -196,7 +196,10 @@ components:
           type: string
           description: "Машиночитаемый код ошибки."
           enum:
-            - invalid_token
+            - authorization_failed
+            - session_expired
+            - session_revoked
+            - suspended_user
         message:
           type: string
           description: "Описание ошибки."

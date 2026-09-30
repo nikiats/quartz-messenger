@@ -166,7 +166,7 @@ func validateSendMessageRequest(req sendMessageRequest) error {
 
 	n := utf8.RuneCountInString(req.Content.Text)
 	if n < 1 || n > maxContentRunes {
-		return errors.New("message.content length must be [1; 1000] UTF characters")
+		return errors.New("content.text length must be [1; 1000] UTF characters")
 	}
 
 	return nil

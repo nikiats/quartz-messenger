@@ -114,9 +114,6 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
-        "403":
-          description: "Действие аккаунта пользователя было приостановлено."
-          $ref: "#/components/responses/Forbidden"
         "500":
           $ref: "#/components/responses/InternalError"
   /tokens:
@@ -304,9 +301,9 @@ paths:
         - "Сообщения"
       summary: "История сообщений чата."
       description: "История сообщений чата.
-        > Параметры before и after нельзя использовать одновременно.
-        > Сообщения отсортированы в порядке от точки загрузки - before/after в направлении незагруженных сообщений.
-        > Результат поиска отсортирован от новых сообщений к старым."
+        Параметры before и after нельзя использовать одновременно.
+        Сообщения отсортированы в порядке от точки загрузки - before/after в направлении незагруженных сообщений.
+        Результат поиска отсортирован от новых сообщений к старым."
       parameters:
         - name: id
           in: path
@@ -319,9 +316,11 @@ paths:
           schema:
             type: integer
             format: int64
+            minimum: 1
         - name: after
           in: query
           schema:
+            minimum: 0
             type: integer
             format: int64
         - name: limit
@@ -345,6 +344,9 @@ paths:
             application/json:
               schema:
                 type: object
+                required:
+                  - hasMore
+                  - messages
                 properties:
                   hasMore:
                     type: boolean
@@ -366,8 +368,8 @@ paths:
         - "Сообщения"
       summary: "Отправка сообщения."
       description: "Отправка сообщения.
-        > Повторная отправка с тем же clientMessageId не создает новое сообщение,
-        > а возвращает ранее сохраненное."
+        Повторная отправка с тем же clientMessageId не создает новое сообщение,
+        а возвращает ранее сохраненное."
       parameters:
         - name: id
           in: path
@@ -454,13 +456,13 @@ paths:
         "403":
           $ref: "#/components/responses/Forbidden"
         "404":
-          description: "Чат или добавляемый пользователь не найден (not_found)."
+          description: "Чат или добавляемый пользователь не найден."
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error404"
         "409":
-          description: "Пользователь уже является участником чата (already_member)."
+          description: "Пользователь уже является участником чата."
           content:
             application/json:
               schema:
@@ -605,6 +607,8 @@ components:
           type: string
         username:
           type: string
+          minLength: 3
+          maxLength: 24
 
     Chat:
       type: object
@@ -672,7 +676,7 @@ components:
           type: string
           format: uuid
         content:
-          type: string
+          $ref: "#/components/schemas/MessageContent"
         sentAt:
           type: string
           format: "date-time"
@@ -680,6 +684,7 @@ components:
         - seqnum
         - senderId
         - content
+        - chatId
         - sentAt
 
     SendMessage:
@@ -689,12 +694,20 @@ components:
           type: string
           format: uuid
         content:
-          minLength: 1
-          maxLength: 1000
-          type: string
+          $ref: "#/components/schemas/MessageContent"
       required:
         - clientMessageId
         - content
+
+    MessageContent:
+      type: object
+      properties:
+        text:
+          type: string
+          minLength: 1
+          maxLength: 1000
+      required:
+        - text
 
     Member:
       type: object
@@ -732,6 +745,7 @@ components:
         visibleName:
           type: string
           minLength: 1
+          maxLength: 32
       required:
         - userId
 
@@ -761,9 +775,10 @@ components:
           type: string
           description: "Машиночитаемый код ошибки."
           enum:
-            - invalid_credentials
-            - invalid_token
-            - unauthorized
+            - authorization_failed
+            - session_expired
+            - session_revoked
+            - suspended_user
         message:
           type: string
           description: "Описание ошибки."
@@ -777,8 +792,8 @@ components:
           type: string
           description: "Машиночитаемый код ошибки."
           enum:
-            - forbidden
-            - suspended_user
+            - need_privileges
+            - edit_private_chat_member
         message:
           type: string
           description: "Описание ошибки."
@@ -792,7 +807,10 @@ components:
           type: string
           description: "Машиночитаемый код ошибки."
           enum:
-            - not_found
+            - chat_not_found
+            - user_not_found
+            - member_not_found
+            - session_not_found
         message:
           type: string
           description: "Описание ошибки."
