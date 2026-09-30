@@ -101,12 +101,15 @@ type Error500 struct {
 // Error500Code Машиночитаемый код ошибки.
 type Error500Code string
 
+// MessageContent defines model for MessageContent.
+type MessageContent struct {
+	Text string `json:"text"`
+}
+
 // ReceivedMessage defines model for ReceivedMessage.
 type ReceivedMessage struct {
-	ChatId  openapi_types.UUID `json:"chatId"`
-	Message struct {
-		Content string `json:"content"`
-	} `json:"message"`
+	ChatId      openapi_types.UUID `json:"chatId"`
+	Content     MessageContent     `json:"content"`
 	RecipientId openapi_types.UUID `json:"recipientId"`
 	SenderId    openapi_types.UUID `json:"senderId"`
 	SentAt      time.Time          `json:"sentAt"`

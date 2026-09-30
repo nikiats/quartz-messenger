@@ -26,12 +26,16 @@ type Session struct {
 	ExpiresAt time.Time
 }
 
+type MessageContent struct {
+	Text string
+}
+
 type Message struct {
 	ChatID          uuid.UUID
 	SenderID        uuid.UUID
 	SessionID       uuid.UUID
 	ClientMessageID uuid.UUID
-	Content         string
+	Content         MessageContent
 }
 
 type Sent struct {
@@ -92,8 +96,10 @@ func (c *Client) SendMessage(ctx context.Context, message Message) (Sent, error)
 		ChatId:          message.ChatID,
 		SenderId:        message.SenderID,
 		ClientMessageId: message.ClientMessageID,
-		Content:         message.Content,
-		SessionId:       message.SessionID,
+		Content: struct {
+			Text string `json:"text"`
+		}{message.Content.Text},
+		SessionId: message.SessionID,
 	}
 
 	resp, err := c.api.SendMessageWithResponse(ctx, body)

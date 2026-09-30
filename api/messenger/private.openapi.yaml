@@ -95,9 +95,7 @@ components:
       type: object
       properties:
         content:
-          type: string
-          minLength: 1
-          maxLength: 1000
+          $ref: "#/components/schemas/MessageContent"
         clientMessageId:
           type: string
           format: uuid
@@ -117,43 +115,59 @@ components:
         - senderId
         - sessionId
 
+    MessageContent:
+      type: object
+      properties:
+        text:
+          type: string
+          minLength: 1
+          maxLength: 1000
+      required:
+        - text
+
     SentMessageResponse:
       type: object
       properties:
         success:
           type: boolean
         error:
-          type: object
-          properties:
-            code:
-              type: string
-              description: "Машиночитаемый код ошибки."
-              enum:
-                - send_failed
-            message:
-              type: string
-              description: "Описание ошибки."
-          required:
-            - code
-            - message
+          $ref: "#/components/schemas/SendMessageError"
         message:
-          type: object
-          properties:
-            chatId:
-              type: string
-              format: uuid
-            seqnum:
-              type: integer
-              format: int64
-            sentAt:
-              type: string
-              format: "date-time"
-          required:
-            - chatId
-            - seqnum
-            - sentAt
+          $ref: "#/components/schemas/SentMessage"
       required:
         - success
+
+    SendMessageError:
+      type: object
+      properties:
+        code:
+          type: string
+          description: "Машиночитаемый код ошибки."
+          enum:
+            - send_failed
+        message:
+          type: string
+          description: "Описание ошибки."
+      required:
+        - code
+        - message
+
+    SentMessage:
+      type: object
+      properties:
+        chatId:
+          type: string
+          format: uuid
+        seqnum:
+          type: integer
+          format: int64
+        sentAt:
+          type: string
+          format: "date-time"
+      required:
+        - chatId
+        - seqnum
+        - sentAt
 
     TokenValidate:
       type: object
@@ -169,37 +183,43 @@ components:
         success:
           type: boolean
         error:
-          type: object
-          properties:
-            code:
-              type: string
-              description: "Машиночитаемый код ошибки."
-              enum:
-                - invalid_token
-            message:
-              type: string
-              description: "Описание ошибки."
-          required:
-            - code
-            - message
+          $ref: "#/components/schemas/ValidateSessionError"
         session:
-          type: object
-          properties:
-            userId:
-              type: string
-              format: uuid
-            sessionId:
-              type: string
-              format: uuid
-            expiresAt:
-              type: string
-              format: "date-time"
-          required:
-            - userId
-            - sessionId
-            - expiresAt
+          $ref: "#/components/schemas/SessionInfo"
       required:
         - success
+
+    ValidateSessionError:
+      type: object
+      properties:
+        code:
+          type: string
+          description: "Машиночитаемый код ошибки."
+          enum:
+            - invalid_token
+        message:
+          type: string
+          description: "Описание ошибки."
+      required:
+        - code
+        - message
+
+    SessionInfo:
+      type: object
+      properties:
+        userId:
+          type: string
+          format: uuid
+        sessionId:
+          type: string
+          format: uuid
+        expiresAt:
+          type: string
+          format: "date-time"
+      required:
+        - userId
+        - sessionId
+        - expiresAt
 
     Error400:
       type: object

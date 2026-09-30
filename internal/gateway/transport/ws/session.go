@@ -219,7 +219,9 @@ func (s *clientSession) handleSendMessage(ctx context.Context, req sendMessageRe
 		SenderID:        s.userID,
 		SessionID:       s.sessionID,
 		ClientMessageID: req.ClientMessageID,
-		Content:         req.Message.Content,
+		Content: messenger.MessageContent{
+			Text: req.Content.Text,
+		},
 	})
 
 	if err != nil {

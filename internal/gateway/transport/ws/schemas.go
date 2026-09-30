@@ -52,13 +52,15 @@ type authorizeRequest struct {
 	Token string `json:"token"`
 }
 
+type messageContent struct {
+	Text string `json:"text"`
+}
+
 type sendMessageRequest struct {
 	base
-	ChatID          uuid.UUID `json:"chatId"`
-	ClientMessageID uuid.UUID `json:"clientMessageId"`
-	Message         struct {
-		Content string `json:"content"`
-	} `json:"message"`
+	ChatID          uuid.UUID      `json:"chatId"`
+	ClientMessageID uuid.UUID      `json:"clientMessageId"`
+	Content         messageContent `json:"content"`
 }
 
 // схемы ответов
@@ -73,8 +75,8 @@ type errorStruct struct {
 }
 
 var ErrorStructInternal = &errorStruct{
-	Code:    codeInternal,
 	Message: "internal error",
+	Code:    codeInternal,
 }
 
 type authorizeResponse struct {
@@ -99,15 +101,11 @@ type pongResponse struct {
 // схемы отправляемых сообщений-событий
 type receiveMessage struct {
 	base
-	ChatID   uuid.UUID `json:"chatId"`
-	SenderID uuid.UUID `json:"senderId"`
-	Seqnum   int64     `json:"seqnum"`
-	SentAt   time.Time `json:"sentAt"`
-	Message  message   `json:"message"`
-}
-
-type message struct {
-	Content string `json:"content"`
+	ChatID   uuid.UUID      `json:"chatId"`
+	SenderID uuid.UUID      `json:"senderId"`
+	Seqnum   int64          `json:"seqnum"`
+	SentAt   time.Time      `json:"sentAt"`
+	Content  messageContent `json:"content"`
 }
 
 type requireAuthorize struct {
@@ -150,8 +148,8 @@ func newReceiveMessage(msg connection.Message) receiveMessage {
 		SenderID: msg.SenderID,
 		Seqnum:   msg.Seqnum,
 		SentAt:   msg.SentAt,
-		Message: message{
-			Content: msg.Content,
+		Content: messageContent{
+			Text: msg.Content,
 		},
 	}
 }
@@ -166,7 +164,7 @@ func validateSendMessageRequest(req sendMessageRequest) error {
 		return errors.New("chatId is required")
 	}
 
-	n := utf8.RuneCountInString(req.Message.Content)
+	n := utf8.RuneCountInString(req.Content.Text)
 	if n < 1 || n > maxContentRunes {
 		return errors.New("message.content length must be [1; 1000] UTF characters")
 	}

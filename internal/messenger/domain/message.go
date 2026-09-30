@@ -7,7 +7,7 @@ import (
 )
 
 type MessageContent struct {
-	Content string
+	Text string
 }
 
 type Message struct {
@@ -15,7 +15,7 @@ type Message struct {
 	SenderID uuid.UUID
 	Seqnum   int64
 	SentAt   time.Time
-	Message  MessageContent
+	Content  MessageContent
 }
 
 type MessageQuery struct {

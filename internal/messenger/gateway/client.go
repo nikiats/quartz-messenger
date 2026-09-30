@@ -48,9 +48,9 @@ func (c Client) DeliverMessage(ctx context.Context, recipientID uuid.UUID, messa
 		Seqnum:      message.Seqnum,
 		RecipientId: recipientID,
 		SentAt:      message.SentAt,
-		Message: struct {
-			Content string `json:"content"`
-		}{message.Message.Content},
+		Content: gatewayprivate.MessageContent{
+			Text: message.Content.Text,
+		},
 	}
 
 	resp, err := c.api.DeliverMessageWithResponse(ctx, body)

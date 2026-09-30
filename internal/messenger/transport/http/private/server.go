@@ -4,13 +4,11 @@ import (
 	"context"
 	"crypto/subtle"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	api "quaztz/internal/api/messageprivate"
 	"quaztz/internal/messenger/domain"
-	"time"
-
-	"github.com/oapi-codegen/runtime/types"
 )
 
 type server struct {
@@ -52,32 +50,39 @@ func requireToken(token string, next http.Handler) http.Handler {
 
 func (s server) SendMessage(ctx context.Context, req api.SendMessageRequestObject) (api.SendMessageResponseObject, error) {
 	send := req.Body
-
 	session := domain.Session{
 		SessionID: send.SessionId,
 		UserID:    send.SenderId,
 	}
-	message, err := s.m.Send(ctx, session, send.ChatId, send.ClientMessageId, send.Content)
-	if err != nil {
+	content := domain.MessageContent{
+		Text: send.Content.Text,
+	}
+	message, err := s.m.Send(ctx, session, send.ChatId, send.ClientMessageId, content)
+
+	switch {
+	case errors.Is(err, domain.ErrChatNotFound):
 		return api.SendMessage200JSONResponse{
 			Success: false,
-			Error: &struct {
-				Code    api.SentMessageResponseErrorCode `json:"code"`
-				Message string                           `json:"message"`
-			}{
+			Error: &api.SendMessageError{
 				Code:    api.SendFailed,
-				Message: "message send failed",
+				Message: "chat not found",
 			},
 		}, nil
+	case errors.Is(err, domain.ErrSessionRevoked):
+		return api.SendMessage200JSONResponse{
+			Success: false,
+			Error: &api.SendMessageError{
+				Code:    api.SendFailed,
+				Message: "session revoked",
+			},
+		}, nil
+	case err != nil:
+		return nil, err
 	}
 
 	return api.SendMessage200JSONResponse{
 		Success: true,
-		Message: &struct {
-			ChatId types.UUID "json:\"chatId\""
-			SentAt time.Time  "json:\"sentAt\""
-			Seqnum int64      "json:\"seqnum\""
-		}{
+		Message: &api.SentMessage{
 			ChatId: message.ChatID,
 			SentAt: message.SentAt,
 			Seqnum: message.Seqnum,
@@ -87,27 +92,40 @@ func (s server) SendMessage(ctx context.Context, req api.SendMessageRequestObjec
 
 func (s server) ValidateSession(ctx context.Context, req api.ValidateSessionRequestObject) (api.ValidateSessionResponseObject, error) {
 	token := req.Body.Token
-
 	session, err := s.a.Authenticate(ctx, token)
-	if err != nil {
+
+	switch {
+	case errors.Is(err, domain.ErrTokenInvalid):
 		return api.ValidateSession200JSONResponse{
 			Success: false,
-			Error: &struct {
-				Code    api.ValidateResponseErrorCode `json:"code"`
-				Message string                        `json:"message"`
-			}{
-				api.InvalidToken,
-				"incorrect token",
+			Error: &api.ValidateSessionError{
+				Code:    api.InvalidToken,
+				Message: "token invalid",
 			},
 		}, nil
+	case errors.Is(err, domain.ErrTokenExpired):
+		return api.ValidateSession200JSONResponse{
+			Success: false,
+			Error: &api.ValidateSessionError{
+				Code:    api.InvalidToken,
+				Message: "token expired",
+			},
+		}, nil
+	case errors.Is(err, domain.ErrSessionRevoked):
+		return api.ValidateSession200JSONResponse{
+			Success: false,
+			Error: &api.ValidateSessionError{
+				Code:    api.InvalidToken,
+				Message: "session revoked",
+			},
+		}, nil
+	case err != nil:
+		return nil, err
 	}
 
 	return api.ValidateSession200JSONResponse{
-		Session: &struct {
-			ExpiresAt time.Time  `json:"expiresAt"`
-			SessionId types.UUID `json:"sessionId"`
-			UserId    types.UUID `json:"userId"`
-		}{
+		Success: true,
+		Session: &api.SessionInfo{
 			ExpiresAt: session.ExpiresAt,
 			SessionId: session.SessionID,
 			UserId:    session.UserID,

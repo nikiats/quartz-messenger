@@ -194,7 +194,7 @@ components:
 
     SendMessagePayload:
       type: object
-      required: [method, chatId, message, clientMessageId]
+      required: [method, chatId, content, clientMessageId]
       properties:
         method:
           type: string
@@ -204,8 +204,8 @@ components:
           type: string
           format: uuid
           description: Идентификатор чата.
-        message:
-          $ref: "#/components/schemas/SentMessage"
+        content:
+          $ref: "#/components/schemas/MessageContent"
         clientMessageId:
           type: string
           format: uuid
@@ -239,7 +239,7 @@ components:
 
     ReceiveMessagePayload:
       type: object
-      required: [method, chatId, senderId, message, seqnum, sentAt]
+      required: [method, chatId, senderId, content, seqnum, sentAt]
       properties:
         method:
           type: string
@@ -253,8 +253,8 @@ components:
           type: string
           format: uuid
           description: Идентификатор отправителя.
-        message:
-          $ref: "#/components/schemas/Message"
+        content:
+          $ref: "#/components/schemas/MessageContent"
         seqnum:
           type: integer
           format: int64
@@ -264,23 +264,12 @@ components:
           format: "date-time"
           description: Время отправки сообщения.
 
-    Message:
-      type: object
-      description: Входящее сообщение.
-      required: [content]
-      properties:
-        content:
-          type: string
-          minLength: 1
-          maxLength: 1000
-          description: Текст сообщения.
-
-    SentMessage:
+    MessageContent:
       type: object
       description: Исходящее сообщение.
-      required: [content]
+      required: [text]
       properties:
-        content:
+        text:
           type: string
           minLength: 1
           maxLength: 1000

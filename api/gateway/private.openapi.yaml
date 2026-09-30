@@ -100,23 +100,26 @@ components:
         recipientId:
           type: string
           format: uuid
-        message:
-          type: object
-          properties:
-            content:
-              type: string
-          required:
-            - content
+        content:
+          $ref: "#/components/schemas/MessageContent"
         sentAt:
           type: string
           format: "date-time"
       required:
         - chatId
         - seqnum
-        - message
+        - content
         - senderId
         - recipientId
         - sentAt
+
+    MessageContent:
+      type: object
+      properties:
+        text:
+          type: string
+      required:
+        - text
 
     Error400:
       type: object

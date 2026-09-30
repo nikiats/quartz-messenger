@@ -64,13 +64,13 @@ func (e Error500Code) Valid() bool {
 	}
 }
 
-// Defines values for SentMessageResponseErrorCode.
+// Defines values for SendMessageErrorCode.
 const (
-	SendFailed SentMessageResponseErrorCode = "send_failed"
+	SendFailed SendMessageErrorCode = "send_failed"
 )
 
-// Valid indicates whether the value is a known member of the SentMessageResponseErrorCode enum.
-func (e SentMessageResponseErrorCode) Valid() bool {
+// Valid indicates whether the value is a known member of the SendMessageErrorCode enum.
+func (e SendMessageErrorCode) Valid() bool {
 	switch e {
 	case SendFailed:
 		return true
@@ -79,13 +79,13 @@ func (e SentMessageResponseErrorCode) Valid() bool {
 	}
 }
 
-// Defines values for ValidateResponseErrorCode.
+// Defines values for ValidateSessionErrorCode.
 const (
-	InvalidToken ValidateResponseErrorCode = "invalid_token"
+	InvalidToken ValidateSessionErrorCode = "invalid_token"
 )
 
-// Valid indicates whether the value is a known member of the ValidateResponseErrorCode enum.
-func (e ValidateResponseErrorCode) Valid() bool {
+// Valid indicates whether the value is a known member of the ValidateSessionErrorCode enum.
+func (e ValidateSessionErrorCode) Valid() bool {
 	switch e {
 	case InvalidToken:
 		return true
@@ -130,34 +130,52 @@ type Error500 struct {
 // Error500Code Машиночитаемый код ошибки.
 type Error500Code string
 
+// MessageContent defines model for MessageContent.
+type MessageContent struct {
+	Text string `json:"text"`
+}
+
+// SendMessageError defines model for SendMessageError.
+type SendMessageError struct {
+	// Code Машиночитаемый код ошибки.
+	Code SendMessageErrorCode `json:"code"`
+
+	// Message Описание ошибки.
+	Message string `json:"message"`
+}
+
+// SendMessageErrorCode Машиночитаемый код ошибки.
+type SendMessageErrorCode string
+
 // SendingMessage defines model for SendingMessage.
 type SendingMessage struct {
 	ChatId          openapi_types.UUID `json:"chatId"`
 	ClientMessageId openapi_types.UUID `json:"clientMessageId"`
-	Content         string             `json:"content"`
+	Content         MessageContent     `json:"content"`
 	SenderId        openapi_types.UUID `json:"senderId"`
 	SessionId       openapi_types.UUID `json:"sessionId"`
 }
 
-// SentMessageResponse defines model for SentMessageResponse.
-type SentMessageResponse struct {
-	Error *struct {
-		// Code Машиночитаемый код ошибки.
-		Code SentMessageResponseErrorCode `json:"code"`
-
-		// Message Описание ошибки.
-		Message string `json:"message"`
-	} `json:"error,omitempty"`
-	Message *struct {
-		ChatId openapi_types.UUID `json:"chatId"`
-		SentAt time.Time          `json:"sentAt"`
-		Seqnum int64              `json:"seqnum"`
-	} `json:"message,omitempty"`
-	Success bool `json:"success"`
+// SentMessage defines model for SentMessage.
+type SentMessage struct {
+	ChatId openapi_types.UUID `json:"chatId"`
+	SentAt time.Time          `json:"sentAt"`
+	Seqnum int64              `json:"seqnum"`
 }
 
-// SentMessageResponseErrorCode Машиночитаемый код ошибки.
-type SentMessageResponseErrorCode string
+// SentMessageResponse defines model for SentMessageResponse.
+type SentMessageResponse struct {
+	Error   *SendMessageError `json:"error,omitempty"`
+	Message *SentMessage      `json:"message,omitempty"`
+	Success bool              `json:"success"`
+}
+
+// SessionInfo defines model for SessionInfo.
+type SessionInfo struct {
+	ExpiresAt time.Time          `json:"expiresAt"`
+	SessionId openapi_types.UUID `json:"sessionId"`
+	UserId    openapi_types.UUID `json:"userId"`
+}
 
 // TokenValidate defines model for TokenValidate.
 type TokenValidate struct {
@@ -166,23 +184,22 @@ type TokenValidate struct {
 
 // ValidateResponse defines model for ValidateResponse.
 type ValidateResponse struct {
-	Error *struct {
-		// Code Машиночитаемый код ошибки.
-		Code ValidateResponseErrorCode `json:"code"`
-
-		// Message Описание ошибки.
-		Message string `json:"message"`
-	} `json:"error,omitempty"`
-	Session *struct {
-		ExpiresAt time.Time          `json:"expiresAt"`
-		SessionId openapi_types.UUID `json:"sessionId"`
-		UserId    openapi_types.UUID `json:"userId"`
-	} `json:"session,omitempty"`
-	Success bool `json:"success"`
+	Error   *ValidateSessionError `json:"error,omitempty"`
+	Session *SessionInfo          `json:"session,omitempty"`
+	Success bool                  `json:"success"`
 }
 
-// ValidateResponseErrorCode Машиночитаемый код ошибки.
-type ValidateResponseErrorCode string
+// ValidateSessionError defines model for ValidateSessionError.
+type ValidateSessionError struct {
+	// Code Машиночитаемый код ошибки.
+	Code ValidateSessionErrorCode `json:"code"`
+
+	// Message Описание ошибки.
+	Message string `json:"message"`
+}
+
+// ValidateSessionErrorCode Машиночитаемый код ошибки.
+type ValidateSessionErrorCode string
 
 // BadRequest defines model for BadRequest.
 type BadRequest = Error400

@@ -53,7 +53,7 @@ func (s server) DeliverMessage(
 		ChatID:   msg.ChatId,
 		SenderID: msg.SenderId,
 		Seqnum:   msg.Seqnum,
-		Content:  msg.Message.Content,
+		Content:  msg.Content.Text,
 		SentAt:   msg.SentAt,
 	})
 
@@ -73,7 +73,7 @@ func validateReceivedMessage(message *api.ReceivedMessage) bool {
 	if message.ChatId == uuid.Nil || message.SenderId == uuid.Nil || message.RecipientId == uuid.Nil {
 		return false
 	}
-	if len(message.Message.Content) == 0 {
+	if len(message.Content.Text) == 0 {
 		return false
 	}
 	if message.Seqnum <= 0 || message.SentAt.IsZero() {
@@ -88,7 +88,6 @@ func requireToken(token string, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		receivedHeader := []byte(r.Header.Get("Authorization"))
 
-		// защита от атак по времени
 		if subtle.ConstantTimeCompare(receivedHeader, desiredHeader) != 1 {
 			unauthorizedRequest(w)
 			return
