@@ -7,7 +7,7 @@ services:
       POSTGRES_PASSWORD: quaztz
       POSTGRES_DB: quaztz
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql
     healthcheck:
@@ -15,6 +15,54 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  messenger:
+    build:
+      context: .
+      dockerfile: deploy/go.Dockerfile
+      args:
+        SERVICE: messenger
+    restart: unless-stopped
+    environment:
+      PUBLIC_HTTP_ADDR: ":8080"
+      PRIVATE_HTTP_ADDR: ":8081"
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN:-change-me}
+      POSTGRES_URL: postgres://quaztz:quaztz@postgres:5432/quaztz?sslmode=disable
+      JWT_SECRET: ${JWT_SECRET:-change-me}
+      ACCESS_TTL: 15m
+      REFRESH_TTL: 168h
+      GATEWAY_URL: http://gateway:9081
+      GATEWAY_MAX_IDLE_CONNS: 200
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  gateway:
+    build:
+      context: .
+      dockerfile: deploy/go.Dockerfile
+      args:
+        SERVICE: gateway
+    restart: unless-stopped
+    environment:
+      WS_ADDR: ":9080"
+      PRIVATE_HTTP_ADDR: ":9081"
+      MESSENGER_URL: http://messenger:8081
+      MESSENGER_MAX_IDLE_CONNS: 200
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN:-change-me}
+      ORIGIN_PATTERNS: ${ORIGIN_PATTERNS:-localhost}
+      ACCESS_TTL: 16m
+
+  web:
+    build:
+      context: .
+      dockerfile: deploy/web.Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-8000}:80"
+    depends_on:
+      - messenger
+      - gateway
 
 volumes:
   postgres-data:

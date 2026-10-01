@@ -1,4 +1,4 @@
-.PHONY: gen sqlc migrate-up migrate-down migrate-status migrate-create
+.PHONY: gen sqlc build migrate-up migrate-down migrate-status migrate-create web-dev up down
 
 -include deploy/messenger.env
 
@@ -25,3 +25,12 @@ migrate-status:
 
 migrate-create:
 	$(GOOSE) -s create $(name) sql
+
+web-dev:
+	cd web && npm run dev
+
+up:
+	docker compose up --build -d
+
+down:
+	docker compose down

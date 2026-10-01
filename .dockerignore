@@ -1,0 +1,7 @@
+.git
+.claude
+docs
+web/node_modules
+web/dist
+deploy/*.env
+*.exe
