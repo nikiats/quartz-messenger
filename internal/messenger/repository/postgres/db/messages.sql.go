@@ -12,8 +12,50 @@ import (
 	"github.com/google/uuid"
 )
 
+const getMessagesAfter = `-- name: GetMessagesAfter :many
+SELECT chat_id, seqnum, sender_id, content, client_message_id, sent_at
+  FROM messages
+ WHERE chat_id = $1
+   AND seqnum > $2
+ ORDER BY seqnum ASC
+ LIMIT $3
+`
+
+type GetMessagesAfterParams struct {
+	ChatID   uuid.UUID
+	After    int64
+	RowLimit int32
+}
+
+func (q *Queries) GetMessagesAfter(ctx context.Context, arg GetMessagesAfterParams) ([]Message, error) {
+	rows, err := q.db.Query(ctx, getMessagesAfter, arg.ChatID, arg.After, arg.RowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Message
+	for rows.Next() {
+		var i Message
+		if err := rows.Scan(
+			&i.ChatID,
+			&i.Seqnum,
+			&i.SenderID,
+			&i.Content,
+			&i.ClientMessageID,
+			&i.SentAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getMessagesBefore = `-- name: GetMessagesBefore :many
-SELECT chat_id, seqnum, sender_id, content, sent_at
+SELECT chat_id, seqnum, sender_id, content, client_message_id, sent_at
   FROM messages
  WHERE chat_id = $1
    AND seqnum < $2
@@ -27,28 +69,119 @@ type GetMessagesBeforeParams struct {
 	RowLimit int32
 }
 
-type GetMessagesBeforeRow struct {
-	ChatID   uuid.UUID
-	Seqnum   int64
-	SenderID uuid.UUID
-	Content  string
-	SentAt   time.Time
-}
-
-func (q *Queries) GetMessagesBefore(ctx context.Context, arg GetMessagesBeforeParams) ([]GetMessagesBeforeRow, error) {
+func (q *Queries) GetMessagesBefore(ctx context.Context, arg GetMessagesBeforeParams) ([]Message, error) {
 	rows, err := q.db.Query(ctx, getMessagesBefore, arg.ChatID, arg.Before, arg.RowLimit)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []GetMessagesBeforeRow
+	var items []Message
 	for rows.Next() {
-		var i GetMessagesBeforeRow
+		var i Message
 		if err := rows.Scan(
 			&i.ChatID,
 			&i.Seqnum,
 			&i.SenderID,
 			&i.Content,
+			&i.ClientMessageID,
+			&i.SentAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const insertMessage = `-- name: InsertMessage :one
+WITH dup AS (
+    SELECT m.seqnum, m.sent_at
+      FROM messages m
+     WHERE m.chat_id = $1
+       AND m.sender_id = $2
+       AND m.client_message_id = $3
+), updchat AS (
+    UPDATE chats c
+       SET last_seqnum     = c.last_seqnum + 1,
+           last_message_at = clock_timestamp()
+     WHERE c.id = $1
+       AND NOT EXISTS (SELECT 1 FROM dup)
+    RETURNING last_seqnum, last_message_at
+), ins AS (
+    INSERT INTO messages (chat_id, seqnum, sender_id, content, client_message_id, sent_at)
+    SELECT $1, updchat.last_seqnum, $2, $4, $3, updchat.last_message_at
+      FROM updchat
+    RETURNING seqnum, sent_at
+)
+SELECT seqnum, sent_at FROM ins
+UNION ALL
+SELECT seqnum, sent_at FROM dup
+`
+
+type InsertMessageParams struct {
+	ChatID          uuid.UUID
+	SenderID        uuid.UUID
+	ClientMessageID uuid.UUID
+	Content         string
+}
+
+type InsertMessageRow struct {
+	Seqnum int64
+	SentAt time.Time
+}
+
+func (q *Queries) InsertMessage(ctx context.Context, arg InsertMessageParams) (InsertMessageRow, error) {
+	row := q.db.QueryRow(ctx, insertMessage,
+		arg.ChatID,
+		arg.SenderID,
+		arg.ClientMessageID,
+		arg.Content,
+	)
+	var i InsertMessageRow
+	err := row.Scan(&i.Seqnum, &i.SentAt)
+	return i, err
+}
+
+const searchMessagesBefore = `-- name: SearchMessagesBefore :many
+SELECT chat_id, seqnum, sender_id, content, client_message_id, sent_at
+  FROM messages
+ WHERE chat_id = $1
+   AND seqnum < $2
+   AND strpos(lower(content), lower($3::text)) > 0
+ ORDER BY seqnum DESC
+ LIMIT $4
+`
+
+type SearchMessagesBeforeParams struct {
+	ChatID   uuid.UUID
+	Before   int64
+	Query    string
+	RowLimit int32
+}
+
+func (q *Queries) SearchMessagesBefore(ctx context.Context, arg SearchMessagesBeforeParams) ([]Message, error) {
+	rows, err := q.db.Query(ctx, searchMessagesBefore,
+		arg.ChatID,
+		arg.Before,
+		arg.Query,
+		arg.RowLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Message
+	for rows.Next() {
+		var i Message
+		if err := rows.Scan(
+			&i.ChatID,
+			&i.Seqnum,
+			&i.SenderID,
+			&i.Content,
+			&i.ClientMessageID,
 			&i.SentAt,
 		); err != nil {
 			return nil, err

@@ -7,9 +7,251 @@ package db
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 )
+
+const addChatMember = `-- name: AddChatMember :one
+INSERT INTO chat_members (chat_id, user_id)
+VALUES ($1, $2)
+ON CONFLICT DO NOTHING
+RETURNING user_id
+`
+
+type AddChatMemberParams struct {
+	ChatID uuid.UUID
+	UserID uuid.UUID
+}
+
+func (q *Queries) AddChatMember(ctx context.Context, arg AddChatMemberParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, addChatMember, arg.ChatID, arg.UserID)
+	var user_id uuid.UUID
+	err := row.Scan(&user_id)
+	return user_id, err
+}
+
+const deleteChat = `-- name: DeleteChat :exec
+UPDATE chats
+   SET deleted = TRUE
+ WHERE id = $1
+`
+
+func (q *Queries) DeleteChat(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteChat, id)
+	return err
+}
+
+const deleteChatMember = `-- name: DeleteChatMember :execrows
+DELETE FROM chat_members
+ WHERE chat_id = $1
+   AND user_id = $2
+   AND user_id IS DISTINCT FROM (SELECT admin FROM chats WHERE id = $1)
+`
+
+type DeleteChatMemberParams struct {
+	ChatID uuid.UUID
+	UserID uuid.UUID
+}
+
+func (q *Queries) DeleteChatMember(ctx context.Context, arg DeleteChatMemberParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteChatMember, arg.ChatID, arg.UserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const findPrivateChat = `-- name: FindPrivateChat :one
+SELECT id
+  FROM chats
+ WHERE type = 'private'
+   AND NOT deleted
+   AND user_a = LEAST($1::uuid, $2::uuid)
+   AND user_b = GREATEST($1::uuid, $2::uuid)
+`
+
+type FindPrivateChatParams struct {
+	UserID uuid.UUID
+	PeerID uuid.UUID
+}
+
+func (q *Queries) FindPrivateChat(ctx context.Context, arg FindPrivateChatParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, findPrivateChat, arg.UserID, arg.PeerID)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
+const getChat = `-- name: GetChat :one
+SELECT c.id, c.type, COALESCE(c.title, peer.visible_name)::text AS title,
+       c.last_seqnum, c.last_message_at
+  FROM chat_members m
+  JOIN chats c ON c.id = m.chat_id
+  LEFT JOIN users peer
+         ON c.type = 'private'
+        AND peer.id = CASE WHEN c.user_a = m.user_id THEN c.user_b ELSE c.user_a END
+ WHERE m.chat_id = $1
+   AND m.user_id = $2
+   AND NOT c.deleted
+`
+
+type GetChatParams struct {
+	ChatID uuid.UUID
+	UserID uuid.UUID
+}
+
+type GetChatRow struct {
+	ID            uuid.UUID
+	Type          ChatType
+	Title         string
+	LastSeqnum    int64
+	LastMessageAt time.Time
+}
+
+func (q *Queries) GetChat(ctx context.Context, arg GetChatParams) (GetChatRow, error) {
+	row := q.db.QueryRow(ctx, getChat, arg.ChatID, arg.UserID)
+	var i GetChatRow
+	err := row.Scan(
+		&i.ID,
+		&i.Type,
+		&i.Title,
+		&i.LastSeqnum,
+		&i.LastMessageAt,
+	)
+	return i, err
+}
+
+const getChatMembers = `-- name: GetChatMembers :many
+SELECT m.user_id, COALESCE(c.admin = m.user_id, FALSE)::boolean AS is_admin
+  FROM chat_members m
+  JOIN chats c ON c.id = m.chat_id
+ WHERE m.chat_id = $1
+ ORDER BY m.joined_at
+`
+
+type GetChatMembersRow struct {
+	UserID  uuid.UUID
+	IsAdmin bool
+}
+
+func (q *Queries) GetChatMembers(ctx context.Context, chatID uuid.UUID) ([]GetChatMembersRow, error) {
+	rows, err := q.db.Query(ctx, getChatMembers, chatID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetChatMembersRow
+	for rows.Next() {
+		var i GetChatMembersRow
+		if err := rows.Scan(&i.UserID, &i.IsAdmin); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getChats = `-- name: GetChats :many
+SELECT c.id, c.type, COALESCE(c.title, peer.visible_name)::text AS title,
+       c.last_seqnum, c.last_message_at
+  FROM chat_members m
+  JOIN chats c ON c.id = m.chat_id
+  LEFT JOIN users peer
+         ON c.type = 'private'
+        AND peer.id = CASE WHEN c.user_a = m.user_id THEN c.user_b ELSE c.user_a END
+ WHERE m.user_id = $1
+   AND NOT c.deleted
+ ORDER BY c.last_message_at DESC
+`
+
+type GetChatsRow struct {
+	ID            uuid.UUID
+	Type          ChatType
+	Title         string
+	LastSeqnum    int64
+	LastMessageAt time.Time
+}
+
+func (q *Queries) GetChats(ctx context.Context, userID uuid.UUID) ([]GetChatsRow, error) {
+	rows, err := q.db.Query(ctx, getChats, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetChatsRow
+	for rows.Next() {
+		var i GetChatsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Type,
+			&i.Title,
+			&i.LastSeqnum,
+			&i.LastMessageAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const insertChatMembers = `-- name: InsertChatMembers :exec
+INSERT INTO chat_members (chat_id, user_id)
+SELECT $1, unnest($2::uuid[])
+`
+
+type InsertChatMembersParams struct {
+	ChatID  uuid.UUID
+	UserIds []uuid.UUID
+}
+
+func (q *Queries) InsertChatMembers(ctx context.Context, arg InsertChatMembersParams) error {
+	_, err := q.db.Exec(ctx, insertChatMembers, arg.ChatID, arg.UserIds)
+	return err
+}
+
+const insertGroupChat = `-- name: InsertGroupChat :exec
+INSERT INTO chats (id, type, title, admin)
+VALUES ($1, 'group', $2::text, $3::uuid)
+`
+
+type InsertGroupChatParams struct {
+	ID    uuid.UUID
+	Title string
+	Admin uuid.UUID
+}
+
+func (q *Queries) InsertGroupChat(ctx context.Context, arg InsertGroupChatParams) error {
+	_, err := q.db.Exec(ctx, insertGroupChat, arg.ID, arg.Title, arg.Admin)
+	return err
+}
+
+const insertPrivateChat = `-- name: InsertPrivateChat :one
+INSERT INTO chats (id, type, user_a, user_b)
+VALUES ($1, 'private', LEAST($2::uuid, $3::uuid), GREATEST($2::uuid, $3::uuid))
+ON CONFLICT (user_a, user_b) WHERE type = 'private' AND NOT deleted DO NOTHING
+RETURNING id
+`
+
+type InsertPrivateChatParams struct {
+	ID     uuid.UUID
+	UserID uuid.UUID
+	PeerID uuid.UUID
+}
+
+func (q *Queries) InsertPrivateChat(ctx context.Context, arg InsertPrivateChatParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, insertPrivateChat, arg.ID, arg.UserID, arg.PeerID)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
+}
 
 const isChatMember = `-- name: IsChatMember :one
 SELECT EXISTS (
@@ -32,4 +274,47 @@ func (q *Queries) IsChatMember(ctx context.Context, arg IsChatMemberParams) (boo
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
+}
+
+const lockChat = `-- name: LockChat :one
+SELECT type, admin
+  FROM chats
+ WHERE id = $1 AND NOT deleted
+   FOR UPDATE
+`
+
+type LockChatRow struct {
+	Type  ChatType
+	Admin *uuid.UUID
+}
+
+func (q *Queries) LockChat(ctx context.Context, id uuid.UUID) (LockChatRow, error) {
+	row := q.db.QueryRow(ctx, lockChat, id)
+	var i LockChatRow
+	err := row.Scan(&i.Type, &i.Admin)
+	return i, err
+}
+
+const passAdminOnLeave = `-- name: PassAdminOnLeave :exec
+WITH successor AS (
+    SELECT user_id
+      FROM chat_members
+     WHERE chat_id = $1 AND user_id <> $2
+     ORDER BY random()
+     LIMIT 1
+)
+UPDATE chats
+   SET admin   = COALESCE((SELECT user_id FROM successor), admin),
+       deleted = NOT EXISTS (SELECT 1 FROM successor)
+ WHERE id = $1
+`
+
+type PassAdminOnLeaveParams struct {
+	ChatID  uuid.UUID
+	AdminID uuid.UUID
+}
+
+func (q *Queries) PassAdminOnLeave(ctx context.Context, arg PassAdminOnLeaveParams) error {
+	_, err := q.db.Exec(ctx, passAdminOnLeave, arg.ChatID, arg.AdminID)
+	return err
 }

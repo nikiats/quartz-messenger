@@ -33,3 +33,102 @@ func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) er
 	)
 	return err
 }
+
+const getRevokedSessions = `-- name: GetRevokedSessions :many
+SELECT id, revoked_at
+  FROM sessions
+ WHERE revoked_at > $1::timestamptz
+`
+
+type GetRevokedSessionsRow struct {
+	ID        uuid.UUID
+	RevokedAt *time.Time
+}
+
+func (q *Queries) GetRevokedSessions(ctx context.Context, since time.Time) ([]GetRevokedSessionsRow, error) {
+	rows, err := q.db.Query(ctx, getRevokedSessions, since)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetRevokedSessionsRow
+	for rows.Next() {
+		var i GetRevokedSessionsRow
+		if err := rows.Scan(&i.ID, &i.RevokedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getSessionForRefresh = `-- name: GetSessionForRefresh :one
+SELECT s.id, s.user_id, s.expires_at, s.revoked_at, u.suspended
+  FROM sessions s
+  JOIN users u ON u.id = s.user_id
+ WHERE s.refresh_token_hash = $1
+   FOR UPDATE OF s
+`
+
+type GetSessionForRefreshRow struct {
+	ID        uuid.UUID
+	UserID    uuid.UUID
+	ExpiresAt time.Time
+	RevokedAt *time.Time
+	Suspended bool
+}
+
+func (q *Queries) GetSessionForRefresh(ctx context.Context, refreshTokenHash string) (GetSessionForRefreshRow, error) {
+	row := q.db.QueryRow(ctx, getSessionForRefresh, refreshTokenHash)
+	var i GetSessionForRefreshRow
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.ExpiresAt,
+		&i.RevokedAt,
+		&i.Suspended,
+	)
+	return i, err
+}
+
+const revokeSession = `-- name: RevokeSession :execrows
+UPDATE sessions
+   SET revoked_at = now()
+ WHERE id = $1
+   AND user_id = $2
+   AND revoked_at IS NULL
+`
+
+type RevokeSessionParams struct {
+	ID     uuid.UUID
+	UserID uuid.UUID
+}
+
+func (q *Queries) RevokeSession(ctx context.Context, arg RevokeSessionParams) (int64, error) {
+	result, err := q.db.Exec(ctx, revokeSession, arg.ID, arg.UserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const updateRefreshToken = `-- name: UpdateRefreshToken :exec
+UPDATE sessions
+   SET refresh_token_hash = $1,
+       expires_at         = $2
+ WHERE id = $3
+`
+
+type UpdateRefreshTokenParams struct {
+	RefreshTokenHash string
+	ExpiresAt        time.Time
+	ID               uuid.UUID
+}
+
+func (q *Queries) UpdateRefreshToken(ctx context.Context, arg UpdateRefreshTokenParams) error {
+	_, err := q.db.Exec(ctx, updateRefreshToken, arg.RefreshTokenHash, arg.ExpiresAt, arg.ID)
+	return err
+}

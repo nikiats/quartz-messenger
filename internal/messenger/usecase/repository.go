@@ -15,7 +15,7 @@ type MessengerRepository interface {
 	IsChatMember(ctx context.Context, chatID, userID uuid.UUID) (bool, error)
 
 	GetChats(ctx context.Context, userID uuid.UUID) ([]domain.Chat, error)
-	GetChat(ctx context.Context, chatID uuid.UUID) (domain.Chat, error)
+	GetChat(ctx context.Context, userID, chatID uuid.UUID) (domain.Chat, error)
 	GetChatMembers(ctx context.Context, chatID uuid.UUID) ([]domain.Member, error)
 	CreateChat(ctx context.Context,
 		userID uuid.UUID,

@@ -2,11 +2,13 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"quaztz/internal/messenger/domain"
 	"quaztz/internal/messenger/repository/postgres/db"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -23,7 +25,12 @@ func NewSessions(pool *pgxpool.Pool) *Sessions {
 }
 
 func (r *Sessions) CreateSession(ctx context.Context, session domain.Session, refreshTokenHash string) error {
-	panic("not implemented")
+	return r.q.CreateSession(ctx, db.CreateSessionParams{
+		ID:               session.SessionID,
+		UserID:           session.UserID,
+		RefreshTokenHash: refreshTokenHash,
+		ExpiresAt:        session.ExpiresAt,
+	})
 }
 
 func (r *Sessions) RefreshSession(
@@ -31,13 +38,66 @@ func (r *Sessions) RefreshSession(
 	oldRefreshTokenHash, newRefreshTokenHash string,
 	expiresAt time.Time,
 ) (domain.Session, error) {
-	panic("not implemented")
+	var session domain.Session
+
+	err := inTx(ctx, r.pool, r.q, func(q *db.Queries) error {
+		row, err := q.GetSessionForRefresh(ctx, oldRefreshTokenHash)
+		switch {
+		case errors.Is(err, pgx.ErrNoRows):
+			return domain.ErrTokenInvalid
+		case err != nil:
+			return err
+		case row.RevokedAt != nil:
+			return domain.ErrSessionRevoked
+		case row.ExpiresAt.Before(time.Now()):
+			return domain.ErrTokenExpired
+		case row.Suspended:
+			return domain.ErrSuspendedUser
+		}
+
+		err = q.UpdateRefreshToken(ctx, db.UpdateRefreshTokenParams{
+			ID:               row.ID,
+			RefreshTokenHash: newRefreshTokenHash,
+			ExpiresAt:        expiresAt,
+		})
+		if err != nil {
+			return err
+		}
+
+		session = domain.Session{
+			UserID:    row.UserID,
+			SessionID: row.ID,
+			ExpiresAt: expiresAt,
+		}
+		return nil
+	})
+
+	return session, err
 }
 
 func (r *Sessions) RevokeSession(ctx context.Context, userID, sessionID uuid.UUID) error {
-	panic("not implemented")
+	affected, err := r.q.RevokeSession(ctx, db.RevokeSessionParams{
+		ID:     sessionID,
+		UserID: userID,
+	})
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return domain.ErrSessionNotFound
+	}
+	return nil
 }
 
 func (r *Sessions) GetRevokedSessions(ctx context.Context, since time.Time) (map[uuid.UUID]time.Time, error) {
-	panic("not implemented")
+	rows, err := r.q.GetRevokedSessions(ctx, since)
+	if err != nil {
+		return nil, err
+	}
+
+	revoked := make(map[uuid.UUID]time.Time, len(rows))
+	for _, row := range rows {
+		revoked[row.ID] = *row.RevokedAt
+	}
+	return revoked, nil
 }

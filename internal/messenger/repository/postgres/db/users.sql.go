@@ -11,6 +11,55 @@ import (
 	"github.com/google/uuid"
 )
 
+const countActiveUsers = `-- name: CountActiveUsers :one
+SELECT count(*)
+  FROM users
+ WHERE id = ANY($1::uuid[])
+   AND NOT suspended
+`
+
+func (q *Queries) CountActiveUsers(ctx context.Context, ids []uuid.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countActiveUsers, ids)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const createUser = `-- name: CreateUser :exec
+INSERT INTO users (id, login, password_hash)
+VALUES ($1, $2, $3)
+`
+
+type CreateUserParams struct {
+	ID           uuid.UUID
+	Login        string
+	PasswordHash string
+}
+
+func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) error {
+	_, err := q.db.Exec(ctx, createUser, arg.ID, arg.Login, arg.PasswordHash)
+	return err
+}
+
+const getCredentials = `-- name: GetCredentials :one
+SELECT id, password_hash, suspended
+  FROM users
+ WHERE login = $1
+`
+
+type GetCredentialsRow struct {
+	ID           uuid.UUID
+	PasswordHash string
+	Suspended    bool
+}
+
+func (q *Queries) GetCredentials(ctx context.Context, login string) (GetCredentialsRow, error) {
+	row := q.db.QueryRow(ctx, getCredentials, login)
+	var i GetCredentialsRow
+	err := row.Scan(&i.ID, &i.PasswordHash, &i.Suspended)
+	return i, err
+}
+
 const getUser = `-- name: GetUser :one
 SELECT id, username, visible_name
   FROM users
@@ -28,4 +77,75 @@ func (q *Queries) GetUser(ctx context.Context, id uuid.UUID) (GetUserRow, error)
 	var i GetUserRow
 	err := row.Scan(&i.ID, &i.Username, &i.VisibleName)
 	return i, err
+}
+
+const isActiveUser = `-- name: IsActiveUser :one
+SELECT EXISTS (
+    SELECT 1 FROM users WHERE id = $1 AND NOT suspended
+)
+`
+
+func (q *Queries) IsActiveUser(ctx context.Context, id uuid.UUID) (bool, error) {
+	row := q.db.QueryRow(ctx, isActiveUser, id)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+const searchUsers = `-- name: SearchUsers :many
+SELECT id, username, visible_name
+  FROM users
+ WHERE starts_with(lower(username), lower($1::text))
+   AND NOT suspended
+ ORDER BY username
+ LIMIT $2
+`
+
+type SearchUsersParams struct {
+	Query    string
+	RowLimit int32
+}
+
+type SearchUsersRow struct {
+	ID          uuid.UUID
+	Username    *string
+	VisibleName string
+}
+
+func (q *Queries) SearchUsers(ctx context.Context, arg SearchUsersParams) ([]SearchUsersRow, error) {
+	rows, err := q.db.Query(ctx, searchUsers, arg.Query, arg.RowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SearchUsersRow
+	for rows.Next() {
+		var i SearchUsersRow
+		if err := rows.Scan(&i.ID, &i.Username, &i.VisibleName); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const updateProfile = `-- name: UpdateProfile :exec
+UPDATE users
+   SET visible_name = COALESCE($1, visible_name),
+       username     = COALESCE($2, username)
+ WHERE id = $3
+`
+
+type UpdateProfileParams struct {
+	VisibleName *string
+	Username    *string
+	ID          uuid.UUID
+}
+
+func (q *Queries) UpdateProfile(ctx context.Context, arg UpdateProfileParams) error {
+	_, err := q.db.Exec(ctx, updateProfile, arg.VisibleName, arg.Username, arg.ID)
+	return err
 }
