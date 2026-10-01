@@ -23,7 +23,11 @@ type Client struct {
 	api *gatewayprivate.ClientWithResponses
 }
 
-func NewClient(baseURL, token string) (*Client, error) {
+func NewClient(baseURL, token string, maxIdleConns int) (*Client, error) {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.MaxIdleConns = maxIdleConns
+	transport.MaxIdleConnsPerHost = maxIdleConns
+
 	authorize := func(_ context.Context, req *http.Request) error {
 		req.Header.Set("Authorization", "Bearer "+token)
 		return nil
@@ -31,7 +35,10 @@ func NewClient(baseURL, token string) (*Client, error) {
 
 	api, err := gatewayprivate.NewClientWithResponses(
 		baseURL,
-		gatewayprivate.WithHTTPClient(&http.Client{Timeout: requestTimeout}),
+		gatewayprivate.WithHTTPClient(&http.Client{
+			Transport: transport,
+			Timeout:   requestTimeout,
+		}),
 		gatewayprivate.WithRequestEditorFn(authorize),
 	)
 	if err != nil {

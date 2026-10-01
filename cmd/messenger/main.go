@@ -31,25 +31,30 @@ func run() error {
 
 	ctx := context.Background()
 
+	// создание пула соединений с БД
 	pool, err := postgres.NewPool(ctx, cfg.PostgresURL)
 	if err != nil {
 		return err
 	}
 	defer pool.Close()
 
+	// автоматическая миграция
 	if err := postgres.Migrate(ctx, pool); err != nil {
 		return err
 	}
 
-	gatewayClient, err := gateway.NewClient(cfg.GatewayURL, cfg.InternalToken)
+	// клиент к gateway service
+	gatewayClient, err := gateway.NewClient(cfg.GatewayURL, cfg.InternalToken, cfg.MaxGatewayIdleConns)
 	if err != nil {
 		return err
 	}
 
+	// создание сущностей слоя repository
 	messengerRepository := postgres.NewMessenger(pool)
 	userRepository := postgres.NewUsers(pool)
 	sessionRepository := postgres.NewSessions(pool)
 
+	// usecase: управление сессиями
 	sessions := usecase.NewSessions(
 		sessionRepository,
 		userRepository,
@@ -58,16 +63,20 @@ func run() error {
 		cfg.AccessTTL,
 		cfg.RefreshTTL,
 	)
+	// загрузка неистекших отозванных сессий в in-memory
+	// хранилище для быстрой проверки при каждом запросе
 	if err := sessions.LoadRevoked(ctx); err != nil {
 		return err
 	}
 
+	// usecase: работа с пользователями, чатами, сообщениями
 	users := usecase.NewUsers(userRepository)
 	chats := usecase.NewChats(messengerRepository)
 	messages := usecase.NewMessages(messengerRepository, gatewayClient)
 
 	errs := make(chan error, 2)
 
+	// запуск публичного API
 	publicApiServer := &http.Server{
 		Addr:              cfg.PublicAddr,
 		Handler:           public.NewHandler(chats, users, messages, sessions, sessions),
@@ -77,6 +86,7 @@ func run() error {
 		errs <- publicApiServer.ListenAndServe()
 	}()
 
+	// запуск внутреннего API
 	privateApiServer := &http.Server{
 		Addr:              cfg.PrivateAddr,
 		Handler:           private.NewHandler(cfg.InternalToken, messages, sessions, sessions),

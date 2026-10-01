@@ -27,21 +27,20 @@ func run() error {
 		return err
 	}
 
-	client, err := messenger.NewClient(cfg.MessengerURL, cfg.InternalToken)
+	// клиент к messenger service
+	client, err := messenger.NewClient(cfg.MessengerURL, cfg.InternalToken, cfg.MaxMessengerIdleConns)
 	if err != nil {
 		return err
 	}
 
+	// in-memory регистр открытых соединений
 	registry := connection.NewRegistry(cfg.AccessTTL)
-
-	public := http.NewServeMux()
-	public.Handle("GET /ws", ws.NewHandler(client, registry, cfg.OriginPatterns))
-
-	private := privatehttp.NewHandler(registry, cfg.InternalToken)
 
 	errs := make(chan error, 2)
 
 	// запуск WebSocket сервера
+	public := http.NewServeMux()
+	public.Handle("GET /ws", ws.NewHandler(client, registry, cfg.OriginPatterns))
 	wsServer := &http.Server{
 		Addr:              cfg.WSAddr,
 		Handler:           public,
@@ -52,6 +51,7 @@ func run() error {
 	}()
 
 	// запуск сервера приватного API
+	private := privatehttp.NewHandler(registry, cfg.InternalToken)
 	privateApiServer := &http.Server{
 		Addr:              cfg.PrivateAddr,
 		Handler:           private,
