@@ -160,9 +160,7 @@ func (s *clientSession) handle(ctx context.Context, data []byte) error {
 
 // обработчики разобранных и валидированных запросов
 func (s *clientSession) handlePing(ctx context.Context, _ pingRequest) error {
-	return s.send(ctx, pongResponse{
-		base: base{methodPong},
-	})
+	return s.send(ctx, newPongResponse())
 }
 
 func (s *clientSession) handleAuthorize(ctx context.Context, req authorizeRequest) error {

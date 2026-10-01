@@ -124,7 +124,7 @@ func (s server) ValidateSession(ctx context.Context, req api.ValidateSessionRequ
 			Success: false,
 			Error: &api.ValidateSessionError{
 				Code:    api.SuspendedUser,
-				Message: "session revoked",
+				Message: "account is suspended",
 			},
 		}, nil
 	case err != nil:

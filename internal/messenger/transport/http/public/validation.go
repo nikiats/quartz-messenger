@@ -13,6 +13,11 @@ const (
 	maxTitleRunes  = 100
 	maxChatMembers = 100
 
+	minLoginLength    = 3
+	maxLoginLength    = 12
+	minPasswordLength = 8
+	maxPasswordLength = 32
+
 	minUsernameLength    = 3
 	maxUsernameLength    = 24
 	minVisibleNameLength = 1
@@ -101,11 +106,14 @@ func validateMessagesParams(params api.GetMessagesParams) error {
 }
 
 func validateUserCreate(user *api.UserCreate) error {
-	if user.Login == "" {
-		return errors.New("login is required")
+	n := utf8.RuneCountInString(user.Login)
+	if n < minLoginLength || n > maxLoginLength {
+		return fmt.Errorf("login length must be [%d; %d]", minLoginLength, maxLoginLength)
 	}
-	if user.Password == "" {
-		return errors.New("password is required")
+
+	n = utf8.RuneCountInString(user.Password)
+	if n < minPasswordLength || n > maxPasswordLength {
+		return fmt.Errorf("password length must be [%d; %d]", minPasswordLength, maxPasswordLength)
 	}
 
 	return nil

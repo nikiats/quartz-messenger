@@ -549,8 +549,12 @@ components:
       properties:
         login:
           type: string
+          minLength: 3
+          maxLength: 12
         password:
           type: string
+          minLength: 8
+          maxLength: 32
       required:
         - login
         - password
