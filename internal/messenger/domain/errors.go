@@ -2,16 +2,12 @@ package domain
 
 import "errors"
 
-// ошибки проверки токена
+// ошибки сессий и авторизации
 var (
-	ErrTokenExpired   = errors.New("token expired")
-	ErrTokenInvalid   = errors.New("token is invalid")
-	ErrSessionRevoked = errors.New("session is revoked")
-	ErrSuspendedUser  = errors.New("account is suspended")
-)
-
-// ошибки при работе с сессиями
-var (
+	ErrTokenExpired       = errors.New("token expired")
+	ErrTokenInvalid       = errors.New("token is invalid")
+	ErrSessionRevoked     = errors.New("session is revoked")
+	ErrSuspendedUser      = errors.New("account is suspended")
 	ErrSessionNotFound    = errors.New("session not found")
 	ErrInvalidCredentials = errors.New("invalid login or password")
 )

@@ -12,11 +12,16 @@ type Authenticator interface {
 	Authenticate(ctx context.Context, accessToken string) (domain.Session, error)
 }
 
+type Sessions interface {
+	CheckRevoked(ctx context.Context, sessionID uuid.UUID) error
+}
+
 type Messages interface {
 	Send(
 		ctx context.Context,
-		session domain.Session,
-		chatID, clientMessageID uuid.UUID,
+		senderID uuid.UUID,
+		chatID uuid.UUID,
+		clientMessageID uuid.UUID,
 		content domain.MessageContent,
 	) (domain.Message, error)
 }

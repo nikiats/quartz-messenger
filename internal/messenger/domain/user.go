@@ -7,3 +7,9 @@ type User struct {
 	Username    string
 	VisibleName string
 }
+
+type Credentials struct {
+	UserID       uuid.UUID
+	PasswordHash string
+	Suspended    bool
+}

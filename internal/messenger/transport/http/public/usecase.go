@@ -49,8 +49,9 @@ type Messages interface {
 	) (messages []domain.Message, hasMore bool, err error)
 	Send(
 		ctx context.Context,
-		session domain.Session,
-		chatID, clientMessageID uuid.UUID,
+		senderID uuid.UUID,
+		chatID uuid.UUID,
+		clientMessageID uuid.UUID,
 		content domain.MessageContent,
 	) (domain.Message, error)
 }

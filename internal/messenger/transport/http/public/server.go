@@ -531,7 +531,7 @@ func (s server) SearchUsers(ctx context.Context, req api.SearchUsersRequestObjec
 }
 
 func (s server) SendMessage(ctx context.Context, req api.SendMessageRequestObject) (api.SendMessageResponseObject, error) {
-	session := sessionFrom(ctx)
+	senderID := sessionFrom(ctx).UserID
 	chatID := req.Id
 	send := req.Body
 
@@ -547,7 +547,7 @@ func (s server) SendMessage(ctx context.Context, req api.SendMessageRequestObjec
 	content := domain.MessageContent{
 		Text: send.Content.Text,
 	}
-	message, err := s.m.Send(ctx, session, chatID, send.ClientMessageId, content)
+	message, err := s.m.Send(ctx, senderID, chatID, send.ClientMessageId, content)
 
 	switch {
 	case errors.Is(err, domain.ErrChatNotFound):
@@ -555,13 +555,6 @@ func (s server) SendMessage(ctx context.Context, req api.SendMessageRequestObjec
 			NotFoundJSONResponse: api.NotFoundJSONResponse{
 				Code:    api.ChatNotFound,
 				Message: "chat not found",
-			},
-		}, nil
-	case errors.Is(err, domain.ErrSessionRevoked):
-		return api.SendMessage401JSONResponse{
-			UnauthorizedJSONResponse: api.UnauthorizedJSONResponse{
-				Code:    api.SessionRevoked,
-				Message: "session revoked",
 			},
 		}, nil
 	case err != nil:

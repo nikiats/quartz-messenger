@@ -14,11 +14,12 @@ import (
 type server struct {
 	m Messages
 	a Authenticator
+	s Sessions
 }
 
-func NewHandler(token string, m Messages, a Authenticator) http.Handler {
+func NewHandler(token string, m Messages, a Authenticator, s Sessions) http.Handler {
 	strict := api.NewStrictHandlerWithOptions(
-		server{m, a},
+		server{m, a, s},
 		nil,
 		api.StrictHTTPServerOptions{
 			RequestErrorHandlerFunc:  badRequest,
@@ -50,15 +51,25 @@ func requireToken(token string, next http.Handler) http.Handler {
 
 func (s server) SendMessage(ctx context.Context, req api.SendMessageRequestObject) (api.SendMessageResponseObject, error) {
 	send := req.Body
-	session := domain.Session{
-		SessionID: send.SessionId,
-		UserID:    send.SenderId,
+
+	err := s.s.CheckRevoked(ctx, send.SessionId)
+	switch {
+	case errors.Is(err, domain.ErrSessionRevoked):
+		return api.SendMessage200JSONResponse{
+			Success: false,
+			Error: &api.SendMessageError{
+				Code:    api.SendFailed,
+				Message: "session revoked",
+			},
+		}, nil
+	case err != nil:
+		return nil, err
 	}
+
 	content := domain.MessageContent{
 		Text: send.Content.Text,
 	}
-	message, err := s.m.Send(ctx, session, send.ChatId, send.ClientMessageId, content)
-
+	message, err := s.m.Send(ctx, send.SenderId, send.ChatId, send.ClientMessageId, content)
 	switch {
 	case errors.Is(err, domain.ErrChatNotFound):
 		return api.SendMessage200JSONResponse{
@@ -66,14 +77,6 @@ func (s server) SendMessage(ctx context.Context, req api.SendMessageRequestObjec
 			Error: &api.SendMessageError{
 				Code:    api.SendFailed,
 				Message: "chat not found",
-			},
-		}, nil
-	case errors.Is(err, domain.ErrSessionRevoked):
-		return api.SendMessage200JSONResponse{
-			Success: false,
-			Error: &api.SendMessageError{
-				Code:    api.SendFailed,
-				Message: "session revoked",
 			},
 		}, nil
 	case err != nil:
