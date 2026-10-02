@@ -14,6 +14,8 @@ import (
 	"quaztz/internal/messenger/transport/http/public"
 	"quaztz/internal/messenger/usecase"
 	loader "quaztz/internal/platform/config"
+
+	"github.com/alexedwards/argon2id"
 )
 
 func main() {
@@ -70,7 +72,8 @@ func run() error {
 	}
 
 	// usecase: работа с пользователями, чатами, сообщениями
-	users := usecase.NewUsers(userRepository)
+	passwordParams := argon2id.Params(cfg.Argon2)
+	users := usecase.NewUsers(userRepository, &passwordParams)
 	chats := usecase.NewChats(messengerRepository)
 	messages := usecase.NewMessages(messengerRepository, gatewayClient)
 

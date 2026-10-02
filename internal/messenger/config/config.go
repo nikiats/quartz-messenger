@@ -12,4 +12,13 @@ type Config struct {
 	InternalToken       string        `env:"INTERNAL_TOKEN,notEmpty"`
 	GatewayURL          string        `env:"GATEWAY_URL,notEmpty"`
 	MaxGatewayIdleConns int           `env:"GATEWAY_MAX_IDLE_CONNS,notEmpty"`
+	Argon2              Argon2        `envPrefix:"ARGON2_"`
+}
+
+type Argon2 struct {
+	Memory      uint32 `env:"MEMORY,notEmpty"`
+	Iterations  uint32 `env:"ITERATIONS,notEmpty"`
+	Parallelism uint8  `env:"PARALLELISM,notEmpty"`
+	SaltLength  uint32 `env:"SALT_LENGTH,notEmpty"`
+	KeyLength   uint32 `env:"KEY_LENGTH,notEmpty"`
 }

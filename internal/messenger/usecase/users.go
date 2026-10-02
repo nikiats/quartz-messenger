@@ -10,26 +10,20 @@ import (
 
 const searchLimit = 20
 
-var passwordParams = &argon2id.Params{
-	Memory:      19 * 1024,
-	Iterations:  2,
-	Parallelism: 1,
-	SaltLength:  16,
-	KeyLength:   32,
-}
-
 type Users struct {
-	r UserRepository
+	r              UserRepository
+	passwordParams *argon2id.Params
 }
 
-func NewUsers(r UserRepository) *Users {
+func NewUsers(r UserRepository, passwordParams *argon2id.Params) *Users {
 	return &Users{
-		r: r,
+		r:              r,
+		passwordParams: passwordParams,
 	}
 }
 
 func (u *Users) Register(ctx context.Context, login, password string) error {
-	hash, err := argon2id.CreateHash(password, passwordParams)
+	hash, err := argon2id.CreateHash(password, u.passwordParams)
 	if err != nil {
 		return err
 	}
