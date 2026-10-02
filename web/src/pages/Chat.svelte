@@ -1,22 +1,23 @@
 <script lang="ts">
 	import { v4 as uuid } from 'uuid';
 	import Page from '../components/Page.svelte';
-	import Input from '../components/Input.svelte';
 	import Button from '../components/Button.svelte';
 	import Avatar from '../components/Avatar.svelte';
 	import Icon from '../components/Icon.svelte';
 	import IconButton from '../components/IconButton.svelte';
 	import MessageBubble from '../components/MessageBubble.svelte';
+	import Composer from '../components/Composer.svelte';
 	import MessageSearchModal from '../components/MessageSearchModal.svelte';
 	import ChatInfoModal from '../components/ChatInfoModal.svelte';
 	import { auth } from '../lib/auth.svelte.js';
+	import { formatDate, isSameDay } from '../lib/format.js';
 	import { getChat, type Chat } from '../lib/chats.js';
 	import { getMessages, sendMessage, type Message } from '../lib/messages.js';
 	import { connection, subscribe } from '../lib/ws.svelte.js';
 	import { setOpenedChat } from '../lib/unread.svelte.js';
 	import { clearAlert, showAlert } from '../lib/alert.svelte.js';
 	import { pollInterval } from '../config/connection.js';
-	import { messageMaxLength } from '../config/chat.js';
+	import { scrollButtonThreshold } from '../config/chat.js';
 
 	let { params }: { params: { id: string } } = $props();
 
@@ -37,6 +38,9 @@
 	let text = $state('');
 	let searchOpen = $state(false);
 	let infoOpen = $state(false);
+	let feed: HTMLDivElement;
+	let scrolledUp = $state(false);
+	let unseen = $state(0);
 
 	const newestFirst = $derived([...messages, ...pending].reverse());
 
@@ -54,6 +58,17 @@
 		const known = new Set(messages.map((bubble) => bubble.seqnum));
 		const unique = added.filter((bubble) => !known.has(bubble.seqnum));
 		messages = [...messages, ...unique].sort((a, b) => a.seqnum! - b.seqnum!);
+	}
+
+	function onScroll() {
+		scrolledUp = feed.scrollTop < -scrollButtonThreshold;
+		if (!scrolledUp) {
+			unseen = 0;
+		}
+	}
+
+	function scrollToBottom() {
+		feed.scrollTo({ top: 0, behavior: 'smooth' });
 	}
 
 	function lastSeqnum(): number {
@@ -110,6 +125,9 @@
 			if (event.method === 'receiveMessage' && event.chatId === chatId) {
 				const last = lastSeqnum();
 				addMessages([toBubble(event)]);
+				if (scrolledUp) {
+					unseen += 1;
+				}
 				if (event.seqnum > last + 1) {
 					loadNewer(chatId, last);
 				}
@@ -141,9 +159,7 @@
 		return () => clearInterval(timer);
 	});
 
-	async function send(e: SubmitEvent) {
-		e.preventDefault();
-
+	function send() {
 		const bubble: Bubble = {
 			key: uuid(),
 			seqnum: null,
@@ -153,6 +169,7 @@
 		};
 		text = '';
 		deliver(bubble);
+		scrollToBottom();
 	}
 
 	function retry(bubble: Bubble) {
@@ -200,35 +217,48 @@
 		<IconButton icon="search" label="Поиск" onclick={() => (searchOpen = true)} />
 	{/snippet}
 
-	<div class="messages">
-		{#each newestFirst as bubble, i (bubble.key)}
-			{@const mine = bubble.senderId === auth.session?.userId}
-			{@const first = newestFirst[i + 1]?.senderId !== bubble.senderId}
-			<MessageBubble
-				text={bubble.text}
-				sentAt={bubble.sentAt}
-				status={mine ? statusOf(bubble) : undefined}
-				{mine}
-				{first}
-				fresh={bubble.seqnum === null || bubble.seqnum >= freshFrom}
-				senderId={chat?.type === 'group' && !mine && first ? bubble.senderId : undefined}
-				onretry={() => retry(bubble)}
-				ondiscard={() => discard(bubble)}
-			/>
-		{/each}
+	<div class="feed">
+		<div class="messages" bind:this={feed} onscroll={onScroll}>
+			{#each newestFirst as bubble, i (bubble.key)}
+				{@const previous = newestFirst[i + 1]}
+				{@const newDay = !previous || !isSameDay(previous.sentAt, bubble.sentAt)}
+				{@const mine = bubble.senderId === auth.session?.userId}
+				{@const first = newDay || previous.senderId !== bubble.senderId}
+				<MessageBubble
+					text={bubble.text}
+					sentAt={bubble.sentAt}
+					status={mine ? statusOf(bubble) : undefined}
+					{mine}
+					{first}
+					fresh={bubble.seqnum === null || bubble.seqnum >= freshFrom}
+					senderId={chat?.type === 'group' && !mine && first ? bubble.senderId : undefined}
+					onretry={() => retry(bubble)}
+					ondiscard={() => discard(bubble)}
+				/>
+				{#if newDay}
+					<p class="date">{formatDate(bubble.sentAt)}</p>
+				{/if}
+			{/each}
 
-		{#if hasMore}
-			<div class="more">
-				<Button variant="secondary" onclick={loadOlder}>Загрузить ещё</Button>
-			</div>
+			{#if hasMore}
+				<div class="more">
+					<Button variant="secondary" onclick={loadOlder}>Загрузить ещё</Button>
+				</div>
+			{/if}
+		</div>
+
+		{#if scrolledUp}
+			<button type="button" class="down" aria-label="К новым сообщениям" onclick={scrollToBottom}>
+				<Icon name="down" size={22} />
+				{#if unseen > 0}
+					<span class="badge">{unseen}</span>
+				{/if}
+			</button>
 		{/if}
 	</div>
 
 	{#snippet footer()}
-		<form class="composer" onsubmit={send}>
-			<Input placeholder="Сообщение" bind:value={text} required maxlength={messageMaxLength} />
-			<button type="submit" class="send" aria-label="Отправить"><Icon name="send" size={22} /></button>
-		</form>
+		<Composer bind:value={text} onsend={send} />
 	{/snippet}
 </Page>
 
@@ -294,34 +324,51 @@
 		margin-bottom: 12px;
 	}
 
-	.composer {
+	.feed {
+		position: relative;
 		display: flex;
-		align-items: center;
-		gap: 10px;
+		flex: 1;
+		min-height: 0;
 	}
 
-	.send {
+	.date {
+		align-self: center;
+		margin: 14px 0 6px;
+		padding: 4px 12px;
+		border-radius: 999px;
+		font-size: 12px;
+		font-weight: 500;
+		color: var(--text-muted);
+		background-color: var(--surface);
+	}
+
+	.down {
+		position: absolute;
+		right: 14px;
+		bottom: 14px;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		flex-shrink: 0;
-		width: 52px;
-		height: 52px;
-		border: none;
+		width: 44px;
+		height: 44px;
+		border: 1px solid var(--border);
 		border-radius: 50%;
+		color: var(--text);
+		background-color: var(--surface);
+		box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+		cursor: pointer;
+	}
+
+	.badge {
+		position: absolute;
+		top: -6px;
+		right: -4px;
+		min-width: 20px;
+		padding: 2px 6px;
+		border-radius: 999px;
+		font-size: 11px;
+		font-weight: 700;
 		color: var(--on-primary);
 		background-color: var(--primary);
-		cursor: pointer;
-		transition:
-			transform 0.15s var(--ease),
-			filter 0.2s var(--ease);
-	}
-
-	.send:hover {
-		filter: brightness(1.06);
-	}
-
-	.send:active {
-		transform: scale(0.94);
 	}
 </style>

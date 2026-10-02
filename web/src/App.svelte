@@ -49,6 +49,7 @@
 		flex-direction: column;
 		height: 100%;
 		max-width: 480px;
+		padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 		margin: 0 auto;
 		border-left: 1px solid var(--divider);
 		border-right: 1px solid var(--divider);

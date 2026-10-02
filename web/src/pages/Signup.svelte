@@ -4,7 +4,7 @@
 	import Form from '../components/Form.svelte';
 	import Input from '../components/Input.svelte';
 	import Button from '../components/Button.svelte';
-	import { register } from '../lib/auth.svelte.js';
+	import { login, register } from '../lib/auth.svelte.js';
 	import { showAlert } from '../lib/alert.svelte.js';
 	import * as limits from '../config/account.js';
 
@@ -13,8 +13,9 @@
 	async function submit() {
 		try {
 			await register(credentials.login, credentials.password);
-			showAlert('success', 'Аккаунт создан, теперь войдите');
-			push('/login');
+			await login(credentials.login, credentials.password);
+			showAlert('success', 'Аккаунт создан');
+			push('/');
 		} catch (err) {
 			showAlert('error', (err as Error).message);
 		}

@@ -1,22 +1,34 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 
-	let { onsubmit, children }: { onsubmit: () => void; children: Snippet } = $props();
+	let { onsubmit, children }: { onsubmit: () => unknown; children: Snippet } = $props();
 
-	function submit(e: SubmitEvent) {
+	let busy = $state(false);
+
+	async function submit(e: SubmitEvent) {
 		e.preventDefault();
-		onsubmit();
+
+		busy = true;
+		try {
+			await onsubmit();
+		} finally {
+			busy = false;
+		}
 	}
 </script>
 
 <form onsubmit={submit}>
-	{@render children()}
+	<fieldset disabled={busy}>
+		{@render children()}
+	</fieldset>
 </form>
 
 <style>
-	form {
+	fieldset {
 		display: flex;
 		flex-direction: column;
 		gap: 12px;
+		min-width: 0;
+		border: none;
 	}
 </style>

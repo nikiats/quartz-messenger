@@ -10,7 +10,7 @@
 <style>
 	.alert {
 		position: fixed;
-		top: 16px;
+		top: calc(16px + env(safe-area-inset-top));
 		left: 0;
 		right: 0;
 		z-index: 10;

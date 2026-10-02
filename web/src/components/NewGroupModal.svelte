@@ -16,6 +16,7 @@
 	let searching = $state(false);
 	let title = $state('');
 	let members = $state<User[]>([]);
+	let creating = $state(false);
 
 	function isMember(user: User): boolean {
 		return members.some((member) => member.userId === user.userId);
@@ -32,6 +33,7 @@
 	async function create(e: SubmitEvent) {
 		e.preventDefault();
 
+		creating = true;
 		try {
 			const chat = await createChat(
 				'group',
@@ -43,6 +45,8 @@
 			push(`/chats/${chat.id}`);
 		} catch (err) {
 			showAlert('error', (err as Error).message);
+		} finally {
+			creating = false;
 		}
 	}
 </script>
@@ -56,7 +60,7 @@
 		<MemberSearch added={isMember} onadd={add} onremove={remove} />
 	{:else}
 		<form id="new-group" class="form" onsubmit={create}>
-			<Input placeholder="Название группы" bind:value={title} required maxlength={groupTitleMaxLength} />
+			<Input placeholder="Название группы" bind:value={title} required maxlength={groupTitleMaxLength} autofocus />
 		</form>
 
 		<p class="label">Участники · {members.length}</p>
@@ -80,7 +84,7 @@
 		{#if searching}
 			<Button onclick={() => (searching = false)}>Готово · {members.length}</Button>
 		{:else}
-			<Button type="submit" form="new-group">Создать</Button>
+			<Button type="submit" form="new-group" disabled={creating}>Создать</Button>
 		{/if}
 	{/snippet}
 </Modal>

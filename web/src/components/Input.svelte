@@ -1,10 +1,18 @@
 <script lang="ts">
 	import type { HTMLInputAttributes } from 'svelte/elements';
 
-	let { value = $bindable(''), ...rest }: HTMLInputAttributes = $props();
+	let { value = $bindable(''), autofocus = false, ...rest }: HTMLInputAttributes = $props();
+
+	let input: HTMLInputElement;
+
+	$effect(() => {
+		if (autofocus) {
+			input.focus();
+		}
+	});
 </script>
 
-<input bind:value {...rest} />
+<input bind:this={input} bind:value {...rest} />
 
 <style>
 	input {
@@ -29,5 +37,9 @@
 	input:focus {
 		border-color: var(--text-muted);
 		box-shadow: 0 0 0 4px var(--hover);
+	}
+
+	input:disabled {
+		opacity: 0.55;
 	}
 </style>

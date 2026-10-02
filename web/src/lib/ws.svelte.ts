@@ -7,7 +7,8 @@ export type ServerEvent =
 	| ({ method: 'receiveMessage' } & Message)
 	| { method: 'authorizeResponse'; success: boolean }
 	| { method: 'sendMessageResponse'; clientMessageId: string; success: boolean; seqnum?: number; sentAt?: string }
-	| { method: 'requireAuthorize' };
+	| { method: 'requireAuthorize' }
+	| { method: 'error' };
 
 type Sent = { seqnum: number; sentAt: string };
 
@@ -105,6 +106,9 @@ function handle(event: ServerEvent) {
 				showAlert('success', 'Соединение восстановлено');
 			}
 			connection.status = 'online';
+			break;
+		case 'error':
+			showAlert('error', 'Неизвестная ошибка');
 			break;
 		case 'requireAuthorize':
 			refresh().then((ok) => ok && authorize());

@@ -10,8 +10,8 @@
 		onremove,
 	}: {
 		added: (user: User) => boolean;
-		onadd: (user: User) => void;
-		onremove?: (user: User) => void;
+		onadd: (user: User) => unknown;
+		onremove?: (user: User) => unknown;
 	} = $props();
 </script>
 

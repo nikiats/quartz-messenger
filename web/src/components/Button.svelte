@@ -7,6 +7,7 @@
 		type = 'button',
 		variant = 'primary',
 		small = false,
+		disabled = false,
 		form,
 		onclick,
 		children,
@@ -16,15 +17,33 @@
 		form?: string;
 		variant?: 'primary' | 'secondary' | 'danger';
 		small?: boolean;
-		onclick?: () => void;
+		disabled?: boolean;
+		onclick?: () => unknown;
 		children: Snippet;
 	} = $props();
+
+	let busy = $state(false);
+
+	async function click() {
+		if (!onclick) {
+			return;
+		}
+
+		busy = true;
+		try {
+			await onclick();
+		} finally {
+			busy = false;
+		}
+	}
 </script>
 
 {#if href}
 	<a {href} class="btn {variant}" class:small use:link>{@render children()}</a>
 {:else}
-	<button {type} {form} class="btn {variant}" class:small {onclick}>{@render children()}</button>
+	<button {type} {form} class="btn {variant}" class:small disabled={disabled || busy} onclick={click}>
+		{@render children()}
+	</button>
 {/if}
 
 <style>
@@ -52,6 +71,13 @@
 
 	.btn:active {
 		transform: scale(0.98);
+	}
+
+	.btn:disabled {
+		opacity: 0.55;
+		cursor: default;
+		transform: none;
+		filter: none;
 	}
 
 	.small {

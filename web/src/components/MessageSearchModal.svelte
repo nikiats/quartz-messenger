@@ -60,7 +60,7 @@
 
 <Modal title="Поиск в чате" {onclose}>
 	<div class="field">
-		<Input placeholder="Текст сообщения" bind:value={query} maxlength={messageQueryMaxLength} />
+		<Input placeholder="Текст сообщения" bind:value={query} maxlength={messageQueryMaxLength} autofocus />
 	</div>
 
 	{#each found ?? [] as message (message.seqnum)}

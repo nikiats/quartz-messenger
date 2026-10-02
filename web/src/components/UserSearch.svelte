@@ -38,7 +38,7 @@
 </script>
 
 <div class="search">
-	<Input placeholder="Поиск по username" bind:value={query} />
+	<Input placeholder="Поиск по username" bind:value={query} autofocus />
 </div>
 
 {#each users ?? [] as user (user.userId)}
