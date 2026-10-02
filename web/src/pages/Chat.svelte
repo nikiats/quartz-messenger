@@ -1,34 +1,59 @@
 <script lang="ts">
+	import { v4 as uuid } from 'uuid';
 	import Page from '../components/Page.svelte';
 	import Input from '../components/Input.svelte';
 	import Button from '../components/Button.svelte';
 	import Avatar from '../components/Avatar.svelte';
 	import Icon from '../components/Icon.svelte';
+	import IconButton from '../components/IconButton.svelte';
+	import MessageBubble from '../components/MessageBubble.svelte';
+	import MessageSearchModal from '../components/MessageSearchModal.svelte';
+	import ChatInfoModal from '../components/ChatInfoModal.svelte';
 	import { auth } from '../lib/auth.svelte.js';
-	import { formatTime } from '../lib/format.js';
 	import { getChat, type Chat } from '../lib/chats.js';
-	import { getMessages, type Message } from '../lib/messages.js';
-	import { getUser } from '../lib/users.js';
-	import { sendMessage, subscribe } from '../lib/ws.js';
+	import { getMessages, sendMessage, type Message } from '../lib/messages.js';
+	import { connection, subscribe } from '../lib/ws.svelte.js';
 	import { setOpenedChat } from '../lib/unread.svelte.js';
 	import { clearAlert, showAlert } from '../lib/alert.svelte.js';
+	import { pollInterval } from '../config/connection.js';
+	import { messageMaxLength } from '../config/chat.js';
 
 	let { params }: { params: { id: string } } = $props();
 
+	type Bubble = {
+		key: string;
+		seqnum: number | null;
+		senderId: string;
+		sentAt: string;
+		text: string;
+		failed?: boolean;
+	};
+
 	let chat = $state<Chat | null>(null);
-	let messages = $state<Message[]>([]);
+	let messages = $state<Bubble[]>([]);
+	let pending = $state<Bubble[]>([]);
 	let hasMore = $state(false);
 	let freshFrom = $state(Infinity);
 	let text = $state('');
+	let searchOpen = $state(false);
+	let infoOpen = $state(false);
 
-	const newestFirst = $derived([...messages].reverse());
+	const newestFirst = $derived([...messages, ...pending].reverse());
 
-	function merge(incoming: Message[]) {
-		const bySeqnum = new Map(messages.map((message) => [message.seqnum, message]));
-		for (const message of incoming) {
-			bySeqnum.set(message.seqnum, message);
-		}
-		messages = [...bySeqnum.values()].sort((a, b) => a.seqnum - b.seqnum);
+	function toBubble(message: Message): Bubble {
+		return {
+			key: String(message.seqnum),
+			seqnum: message.seqnum,
+			senderId: message.senderId,
+			sentAt: message.sentAt,
+			text: message.content.text,
+		};
+	}
+
+	function addMessages(added: Bubble[]) {
+		const known = new Set(messages.map((bubble) => bubble.seqnum));
+		const unique = added.filter((bubble) => !known.has(bubble.seqnum));
+		messages = [...messages, ...unique].sort((a, b) => a.seqnum! - b.seqnum!);
 	}
 
 	function lastSeqnum(): number {
@@ -39,7 +64,7 @@
 		try {
 			chat = await getChat(chatId);
 			const page = await getMessages(chatId, 'before', chat.lastSeqnum + 1);
-			merge(page.messages);
+			addMessages(page.messages.map(toBubble));
 			hasMore = page.hasMore;
 			freshFrom = lastSeqnum() + 1;
 		} catch (err) {
@@ -49,8 +74,8 @@
 
 	async function loadOlder() {
 		try {
-			const page = await getMessages(params.id, 'before', messages[0].seqnum);
-			merge(page.messages);
+			const page = await getMessages(params.id, 'before', messages[0].seqnum!);
+			addMessages(page.messages.map(toBubble));
 			hasMore = page.hasMore;
 		} catch (err) {
 			showAlert('error', (err as Error).message);
@@ -60,7 +85,7 @@
 	async function loadNewer(chatId: string, after: number) {
 		try {
 			const page = await getMessages(chatId, 'after', after);
-			merge(page.messages);
+			addMessages(page.messages.map(toBubble));
 		} catch (err) {
 			showAlert('error', (err as Error).message);
 		}
@@ -71,6 +96,7 @@
 
 		chat = null;
 		messages = [];
+		pending = [];
 		hasMore = false;
 		freshFrom = Infinity;
 		load(chatId);
@@ -83,7 +109,7 @@
 
 			if (event.method === 'receiveMessage' && event.chatId === chatId) {
 				const last = lastSeqnum();
-				merge([event]);
+				addMessages([toBubble(event)]);
 				if (event.seqnum > last + 1) {
 					loadNewer(chatId, last);
 				}
@@ -100,26 +126,60 @@
 		};
 	});
 
+	$effect(() => {
+		if (connection.status === 'online' || !chat) {
+			return;
+		}
+
+		const chatId = chat.id;
+		const timer = setInterval(async () => {
+			const page = await getMessages(chatId, 'after', lastSeqnum()).catch(() => null);
+			if (page) {
+				addMessages(page.messages.map(toBubble));
+			}
+		}, pollInterval);
+		return () => clearInterval(timer);
+	});
+
 	async function send(e: SubmitEvent) {
 		e.preventDefault();
 
-		const content = text;
+		const bubble: Bubble = {
+			key: uuid(),
+			seqnum: null,
+			senderId: auth.session!.userId,
+			sentAt: new Date().toISOString(),
+			text,
+		};
 		text = '';
+		deliver(bubble);
+	}
+
+	function retry(bubble: Bubble) {
+		deliver({ ...bubble, failed: false });
+	}
+
+	function statusOf(bubble: Bubble): 'failed' | 'pending' | 'sent' {
+		if (bubble.failed) {
+			return 'failed';
+		}
+		return bubble.seqnum === null ? 'pending' : 'sent';
+	}
+
+	function discard(bubble: Bubble) {
+		pending = pending.filter((item) => item.key !== bubble.key);
+	}
+
+	async function deliver(bubble: Bubble) {
+		pending = [...pending.filter((item) => item.key !== bubble.key), bubble];
 
 		try {
-			const sent = await sendMessage(params.id, content);
-			merge([
-				{
-					chatId: params.id,
-					senderId: auth.session!.userId,
-					seqnum: sent.seqnum,
-					sentAt: sent.sentAt,
-					content: { text: content },
-				},
-			]);
+			const sent = await sendMessage(params.id, bubble.key, bubble.text);
+			discard(bubble);
+			addMessages([{ ...bubble, seqnum: sent.seqnum, sentAt: sent.sentAt }]);
 			clearAlert();
 		} catch (err) {
-			text = content;
+			pending = pending.map((item) => (item.key === bubble.key ? { ...item, failed: true } : item));
 			showAlert('error', (err as Error).message);
 		}
 	}
@@ -127,28 +187,34 @@
 
 <Page back="/" padded={false}>
 	{#snippet heading()}
-		<div class="peer">
+		<button type="button" class="peer" onclick={() => (infoOpen = true)} disabled={!chat}>
 			<Avatar name={chat?.title} id={params.id} size={40} />
-			<div class="peer-text">
+			<span class="peer-text">
 				<span class="peer-title">{chat?.title ?? ''}</span>
 				<span class="peer-type">{chat?.type === 'group' ? 'группа' : 'личный чат'}</span>
-			</div>
-		</div>
+			</span>
+		</button>
+	{/snippet}
+
+	{#snippet actions()}
+		<IconButton icon="search" label="Поиск" onclick={() => (searchOpen = true)} />
 	{/snippet}
 
 	<div class="messages">
-		{#each newestFirst as message, i (message.seqnum)}
-			{@const mine = message.senderId === auth.session?.userId}
-			{@const first = newestFirst[i + 1]?.senderId !== message.senderId}
-			<div class="message" class:mine class:first class:fresh={message.seqnum >= freshFrom}>
-				{#if chat?.type === 'group' && !mine && first}
-					<span class="sender">
-						{#await getUser(message.senderId) then user}{user.visibleName}{/await}
-					</span>
-				{/if}
-				<span class="text">{message.content.text}</span>
-				<span class="time">{formatTime(message.sentAt)}</span>
-			</div>
+		{#each newestFirst as bubble, i (bubble.key)}
+			{@const mine = bubble.senderId === auth.session?.userId}
+			{@const first = newestFirst[i + 1]?.senderId !== bubble.senderId}
+			<MessageBubble
+				text={bubble.text}
+				sentAt={bubble.sentAt}
+				status={mine ? statusOf(bubble) : undefined}
+				{mine}
+				{first}
+				fresh={bubble.seqnum === null || bubble.seqnum >= freshFrom}
+				senderId={chat?.type === 'group' && !mine && first ? bubble.senderId : undefined}
+				onretry={() => retry(bubble)}
+				ondiscard={() => discard(bubble)}
+			/>
 		{/each}
 
 		{#if hasMore}
@@ -160,11 +226,19 @@
 
 	{#snippet footer()}
 		<form class="composer" onsubmit={send}>
-			<Input placeholder="Сообщение" bind:value={text} required maxlength={1000} />
+			<Input placeholder="Сообщение" bind:value={text} required maxlength={messageMaxLength} />
 			<button type="submit" class="send" aria-label="Отправить"><Icon name="send" size={22} /></button>
 		</form>
 	{/snippet}
 </Page>
+
+{#if searchOpen}
+	<MessageSearchModal chatId={params.id} onclose={() => (searchOpen = false)} />
+{/if}
+
+{#if infoOpen && chat}
+	<ChatInfoModal {chat} onclose={() => (infoOpen = false)} />
+{/if}
 
 <style>
 	.peer {
@@ -172,6 +246,18 @@
 		align-items: center;
 		gap: 12px;
 		min-width: 0;
+		padding: 4px 12px 4px 4px;
+		border: none;
+		border-radius: 999px;
+		text-align: left;
+		color: var(--text);
+		background: none;
+		cursor: pointer;
+		transition: background-color 0.2s var(--ease);
+	}
+
+	.peer:hover {
+		background-color: var(--hover);
 	}
 
 	.peer-text {
@@ -201,77 +287,6 @@
 		overflow-y: auto;
 		gap: 3px;
 		padding: 16px 14px;
-	}
-
-	.message {
-		display: flex;
-		flex-direction: column;
-		align-self: flex-start;
-		max-width: 76%;
-		padding: 8px 14px;
-		border-radius: 20px;
-		background-color: var(--surface);
-		overflow-wrap: anywhere;
-	}
-
-	.message.fresh {
-		animation: appear 0.4s cubic-bezier(0.25, 0.8, 0.35, 1);
-		transform-origin: bottom left;
-	}
-
-	.message.fresh.mine {
-		transform-origin: bottom right;
-	}
-
-	@keyframes appear {
-		from {
-			opacity: 0;
-			transform: translateY(18px) scale(0.85);
-		}
-	}
-
-	.message.first {
-		margin-top: 10px;
-	}
-
-	.message.mine {
-		align-self: flex-end;
-		color: var(--text);
-		background-color: var(--accent);
-	}
-
-	.message.first:not(.mine) {
-		border-top-left-radius: 6px;
-	}
-
-	.message.first.mine {
-		border-top-right-radius: 6px;
-	}
-
-	.sender {
-		margin-bottom: 2px;
-		font-size: 13px;
-		font-weight: 600;
-		color: var(--text-muted);
-	}
-
-	.text {
-		font-size: 15px;
-		line-height: 1.4;
-		white-space: pre-wrap;
-	}
-
-	.time {
-		align-self: flex-end;
-		margin-top: 2px;
-		font-size: 11px;
-		font-variant-numeric: tabular-nums;
-		color: var(--text-muted);
-	}
-
-	.message.mine .time {
-		color: var(--text);
-		opacity: 0.65;
 	}
 
 	.more {

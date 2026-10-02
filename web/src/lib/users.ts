@@ -10,13 +10,19 @@ const users = new Map<string, Promise<User>>();
 
 export function getUser(userId: string): Promise<User> {
 	if (!users.has(userId)) {
-		users.set(
-			userId,
-			authFetch(`/api/users/${userId}`).then((res) => res.json()),
-		);
+		users.set(userId, fetchUser(userId));
 	}
 
 	return users.get(userId)!;
+}
+
+async function fetchUser(userId: string): Promise<User> {
+	const res = await authFetch(`/api/users/${userId}`);
+	if (!res.ok) {
+		throw new Error('Не удалось загрузить пользователя');
+	}
+
+	return res.json();
 }
 
 export async function searchUsers(query: string): Promise<User[]> {

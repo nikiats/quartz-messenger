@@ -4,10 +4,9 @@
 	import { auth } from '../lib/auth.svelte.js';
 	import { searchUsers, type User } from '../lib/users.js';
 	import { clearAlert, showAlert } from '../lib/alert.svelte.js';
+	import { userSearchDelay } from '../config/search.js';
 
 	let { row }: { row: Snippet<[User]> } = $props();
-
-	const searchDelay = 100;
 
 	let query = $state('');
 	let users = $state<User[] | null>(null);
@@ -19,7 +18,7 @@
 			return;
 		}
 
-		const timer = setTimeout(() => search(q), searchDelay);
+		const timer = setTimeout(() => search(q), userSearchDelay);
 		return () => clearTimeout(timer);
 	});
 

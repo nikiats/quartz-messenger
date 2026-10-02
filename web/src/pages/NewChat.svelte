@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { push } from 'svelte-spa-router';
 	import Page from '../components/Page.svelte';
-	import Row from '../components/Row.svelte';
+	import UserRow from '../components/UserRow.svelte';
 	import UserSearch from '../components/UserSearch.svelte';
 	import { createChat } from '../lib/chats.js';
 	import type { User } from '../lib/users.js';
@@ -21,12 +21,7 @@
 <Page title="Новый чат" back="/" padded={false}>
 	<UserSearch>
 		{#snippet row(user)}
-			<Row
-				onclick={() => write(user)}
-				id={user.userId}
-				title={user.visibleName ?? ''}
-				subtitle={user.username ? `@${user.username}` : ''}
-			/>
+			<UserRow {user} onclick={() => write(user)} />
 		{/snippet}
 	</UserSearch>
 </Page>

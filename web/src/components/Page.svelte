@@ -1,7 +1,6 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import { link } from 'svelte-spa-router';
-	import Icon from './Icon.svelte';
+	import IconButton from './IconButton.svelte';
 
 	let {
 		title = '',
@@ -25,9 +24,7 @@
 <section class="page">
 	<header>
 		{#if back}
-			<a href={back} class="back" use:link aria-label="Назад">
-				<Icon name="back" />
-			</a>
+			<IconButton href={back} icon="back" label="Назад" />
 		{/if}
 		<div class="heading" class:indent={!back}>
 			{#if heading}
@@ -63,25 +60,6 @@
 		height: 64px;
 		padding: 0 12px 0 6px;
 		border-bottom: 1px solid var(--divider);
-	}
-
-	.back {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		width: 44px;
-		height: 44px;
-		border-radius: 50%;
-		color: var(--text);
-		transition: background-color 0.2s var(--ease);
-	}
-
-	.back:hover {
-		background-color: var(--hover);
-	}
-
-	.back:active {
-		background-color: var(--active);
 	}
 
 	.heading {

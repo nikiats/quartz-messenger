@@ -65,29 +65,38 @@ export async function authFetch(url: string, method = 'GET', body?: unknown): Pr
 	return res;
 }
 
+let refreshing: Promise<boolean> | null = null;
+
 export function refresh(): Promise<boolean> {
-	return navigator.locks.request('token-refresh', async () => {
-		const current = auth.session;
-		if (!current) {
-			return false;
-		}
+	if (!refreshing) {
+		const run = navigator.locks ? navigator.locks.request('token-refresh', refreshTokens) : refreshTokens();
+		refreshing = run.finally(() => (refreshing = null));
+	}
 
-		const stored = restore();
-		if (stored && stored.refreshToken !== current.refreshToken) {
-			save(stored);
-			return true;
-		}
+	return refreshing;
+}
 
-		const res = await request('/api/tokens', 'POST', { refreshToken: current.refreshToken });
-		if (!res.ok) {
-			save(null);
-			return false;
-		}
+async function refreshTokens(): Promise<boolean> {
+	const current = auth.session;
+	if (!current) {
+		return false;
+	}
 
-		const tokens = await res.json();
-		save({ ...current, token: tokens.token, refreshToken: tokens.refreshToken });
+	const stored = restore();
+	if (stored && stored.refreshToken !== current.refreshToken) {
+		save(stored);
 		return true;
-	});
+	}
+
+	const res = await request('/api/tokens', 'POST', { refreshToken: current.refreshToken });
+	if (!res.ok) {
+		save(null);
+		return false;
+	}
+
+	const tokens = await res.json();
+	save({ ...current, token: tokens.token, refreshToken: tokens.refreshToken });
+	return true;
 }
 
 export async function register(login: string, password: string) {

@@ -1,5 +1,5 @@
 import { SvelteSet } from 'svelte/reactivity';
-import { subscribe } from './ws.js';
+import { subscribe } from './ws.svelte.js';
 
 export const unread = new SvelteSet<string>();
 

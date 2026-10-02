@@ -4,11 +4,12 @@
 	import Input from './Input.svelte';
 	import Button from './Button.svelte';
 	import Icon from './Icon.svelte';
-	import Row from './Row.svelte';
-	import UserSearch from './UserSearch.svelte';
+	import UserRow from './UserRow.svelte';
+	import MemberSearch from './MemberSearch.svelte';
 	import { createChat } from '../lib/chats.js';
 	import type { User } from '../lib/users.js';
 	import { clearAlert, showAlert } from '../lib/alert.svelte.js';
+	import { groupTitleMaxLength } from '../config/chat.js';
 
 	let { onclose }: { onclose: () => void } = $props();
 
@@ -20,8 +21,12 @@
 		return members.some((member) => member.userId === user.userId);
 	}
 
-	function toggle(user: User) {
-		members = isMember(user) ? members.filter((member) => member.userId !== user.userId) : [...members, user];
+	function add(user: User) {
+		members = [...members, user];
+	}
+
+	function remove(user: User) {
+		members = members.filter((member) => member.userId !== user.userId);
 	}
 
 	async function create(e: SubmitEvent) {
@@ -42,38 +47,26 @@
 	}
 </script>
 
-{#snippet memberRow(user: User, label: string, variant: 'primary' | 'secondary')}
-	<Row id={user.userId} title={user.visibleName ?? ''} subtitle={user.username ? `@${user.username}` : ''}>
-		{#snippet trailing()}
-			<Button small {variant} onclick={() => toggle(user)}>{label}</Button>
-		{/snippet}
-	</Row>
-{/snippet}
-
 <Modal
 	title={searching ? 'Добавить участников' : 'Новая группа'}
 	{onclose}
 	onback={searching ? () => (searching = false) : undefined}
 >
 	{#if searching}
-		<UserSearch>
-			{#snippet row(user)}
-				{#if isMember(user)}
-					{@render memberRow(user, 'Добавлен', 'secondary')}
-				{:else}
-					{@render memberRow(user, 'Добавить', 'primary')}
-				{/if}
-			{/snippet}
-		</UserSearch>
+		<MemberSearch added={isMember} onadd={add} onremove={remove} />
 	{:else}
 		<form id="new-group" class="form" onsubmit={create}>
-			<Input placeholder="Название группы" bind:value={title} required maxlength={100} />
+			<Input placeholder="Название группы" bind:value={title} required maxlength={groupTitleMaxLength} />
 		</form>
 
 		<p class="label">Участники · {members.length}</p>
 
 		{#each members as member (member.userId)}
-			{@render memberRow(member, 'Убрать', 'secondary')}
+			<UserRow user={member}>
+				{#snippet trailing()}
+					<Button small variant="secondary" onclick={() => remove(member)}>Убрать</Button>
+				{/snippet}
+			</UserRow>
 		{/each}
 
 		<div class="add">

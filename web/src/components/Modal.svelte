@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import { fade, scale } from 'svelte/transition';
-	import Icon from './Icon.svelte';
+	import IconButton from './IconButton.svelte';
 
 	let {
 		title,
@@ -32,14 +32,10 @@
 	<div class="sheet" role="dialog" aria-modal="true" aria-label={title} transition:scale={{ start: 0.96, duration: 200 }}>
 		<header>
 			{#if onback}
-				<button type="button" class="icon-btn" aria-label="Назад" onclick={onback}>
-					<Icon name="back" />
-				</button>
+				<IconButton icon="back" label="Назад" onclick={onback} />
 			{/if}
 			<h2 class:indent={!onback}>{title}</h2>
-			<button type="button" class="icon-btn" aria-label="Закрыть" onclick={onclose}>
-				<Icon name="close" size={22} />
-			</button>
+			<IconButton icon="close" label="Закрыть" onclick={onclose} />
 		</header>
 
 		<div class="body">
@@ -107,25 +103,6 @@
 
 	h2.indent {
 		padding-left: 18px;
-	}
-
-	.icon-btn {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		flex-shrink: 0;
-		width: 44px;
-		height: 44px;
-		border: none;
-		border-radius: 50%;
-		color: var(--text);
-		background: none;
-		cursor: pointer;
-		transition: background-color 0.2s var(--ease);
-	}
-
-	.icon-btn:hover {
-		background-color: var(--hover);
 	}
 
 	.body {

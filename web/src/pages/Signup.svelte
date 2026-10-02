@@ -6,6 +6,7 @@
 	import Button from '../components/Button.svelte';
 	import { register } from '../lib/auth.svelte.js';
 	import { showAlert } from '../lib/alert.svelte.js';
+	import * as limits from '../config/account.js';
 
 	let credentials = $state({ login: '', password: '' });
 
@@ -22,8 +23,21 @@
 
 <Page title="Регистрация" back="/">
 	<Form onsubmit={submit}>
-		<Input placeholder="Логин" bind:value={credentials.login} required minlength={3} maxlength={12} />
-		<Input placeholder="Пароль" type="password" bind:value={credentials.password} required minlength={8} maxlength={32} />
+		<Input
+			placeholder="Логин"
+			bind:value={credentials.login}
+			required
+			minlength={limits.login.min}
+			maxlength={limits.login.max}
+		/>
+		<Input
+			placeholder="Пароль"
+			type="password"
+			bind:value={credentials.password}
+			required
+			minlength={limits.password.min}
+			maxlength={limits.password.max}
+		/>
 		<Button type="submit">Создать аккаунт</Button>
 	</Form>
 	<p class="hint">Уже есть аккаунт? <a href="/login" use:link>Войти</a></p>

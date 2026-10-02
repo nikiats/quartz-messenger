@@ -1,18 +1,34 @@
 <script lang="ts">
 	import Row from './Row.svelte';
 	import { getChats, type Chat } from '../lib/chats.js';
-	import { subscribe } from '../lib/ws.js';
+	import { connection, subscribe } from '../lib/ws.svelte.js';
 	import { unread } from '../lib/unread.svelte.js';
 	import { formatDay } from '../lib/format.js';
+	import { pollInterval } from '../config/connection.js';
 
 	let chats = $state<Chat[] | null>(null);
 	let error = $state('');
 
 	async function load() {
 		try {
-			chats = await getChats();
+			const fresh = await getChats();
+			markUnread(fresh);
+			chats = fresh;
 		} catch (err) {
 			error = (err as Error).message;
+		}
+	}
+
+	function markUnread(fresh: Chat[]) {
+		if (!chats) {
+			return;
+		}
+
+		for (const chat of fresh) {
+			const before = chats.find((known) => known.id === chat.id);
+			if (chat.lastSeqnum > (before?.lastSeqnum ?? 0)) {
+				unread.add(chat.id);
+			}
 		}
 	}
 
@@ -34,6 +50,15 @@
 			chat.lastMessageAt = event.sentAt;
 			chats = [chat, ...chats.filter((other) => other !== chat)];
 		});
+	});
+
+	$effect(() => {
+		if (connection.status === 'online') {
+			return;
+		}
+
+		const timer = setInterval(load, pollInterval);
+		return () => clearInterval(timer);
 	});
 </script>
 

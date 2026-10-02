@@ -2,6 +2,7 @@
 	import { link } from 'svelte-spa-router';
 	import Page from '../components/Page.svelte';
 	import Button from '../components/Button.svelte';
+	import ButtonRow from '../components/ButtonRow.svelte';
 	import Avatar from '../components/Avatar.svelte';
 	import Icon from '../components/Icon.svelte';
 	import ChatList from '../components/ChatList.svelte';
@@ -22,12 +23,12 @@
 		<ChatList />
 
 		{#snippet footer()}
-			<div class="create">
-				<Button href="/search"><Icon name="pencil" size={20} />Написать</Button>
+			<ButtonRow>
+				<Button href="/new-chat"><Icon name="pencil" size={20} />Написать</Button>
 				<Button variant="secondary" onclick={() => (groupOpen = true)}>
 					<Icon name="group" size={20} />Новая группа
 				</Button>
-			</div>
+			</ButtonRow>
 		{/snippet}
 	</Page>
 
@@ -58,12 +59,6 @@
 
 	.me:hover {
 		box-shadow: 0 0 0 3px var(--active);
-	}
-
-	.create {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 10px;
 	}
 
 	.welcome {

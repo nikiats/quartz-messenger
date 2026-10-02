@@ -2,16 +2,17 @@
 	import Router from 'svelte-spa-router';
 
 	import Alert from './components/Alert.svelte';
+	import ConnectionBanner from './components/ConnectionBanner.svelte';
 
 	import Index from './pages/Index.svelte';
 	import Chat from './pages/Chat.svelte';
 	import Signup from './pages/Signup.svelte';
 	import Login from './pages/Login.svelte';
 	import Profile from './pages/Profile.svelte';
-	import Search from './pages/Search.svelte';
+	import NewChat from './pages/NewChat.svelte';
 
 	import { auth, loadUser } from './lib/auth.svelte.js';
-	import { connect, disconnect } from './lib/ws.js';
+	import { connect, disconnect } from './lib/ws.svelte.js';
 
 	const routes = {
 		'/': Index,
@@ -19,7 +20,7 @@
 		'/signup': Signup,
 		'/login': Login,
 		'/profile': Profile,
-		'/search': Search,
+		'/new-chat': NewChat,
 	};
 
 	loadUser();
@@ -38,6 +39,7 @@
 
 <main>
 	<Alert />
+	<ConnectionBanner />
 	<Router {routes} />
 </main>
 

@@ -1,4 +1,6 @@
 import { auth, refresh } from './auth.svelte.js';
+import { showAlert } from './alert.svelte.js';
+import { pingInterval, reconnectDelay } from '../config/connection.js';
 import type { Message } from './messages.js';
 
 export type ServerEvent =
@@ -9,11 +11,9 @@ export type ServerEvent =
 
 type Sent = { seqnum: number; sentAt: string };
 
-const pingInterval = 50_000;
-const reconnectDelay = 3_000;
+export const connection = $state<{ status: 'connecting' | 'online' | 'offline' }>({ status: 'connecting' });
 
 let socket: WebSocket | null = null;
-let authorized = false;
 let active = false;
 let reconnectTimer: ReturnType<typeof setTimeout>;
 
@@ -22,6 +22,7 @@ const pending = new Map<string, { resolve: (sent: Sent) => void; reject: (err: E
 
 export function connect() {
 	active = true;
+	connection.status = 'connecting';
 	open();
 }
 
@@ -30,6 +31,7 @@ export function disconnect() {
 	clearTimeout(reconnectTimer);
 	socket?.close();
 	socket = null;
+	connection.status = 'connecting';
 }
 
 export function subscribe(listener: (event: ServerEvent) => void): () => void {
@@ -39,12 +41,11 @@ export function subscribe(listener: (event: ServerEvent) => void): () => void {
 	};
 }
 
-export function sendMessage(chatId: string, text: string): Promise<Sent> {
-	if (!authorized) {
+export function sendOverSocket(chatId: string, clientMessageId: string, text: string): Promise<Sent> {
+	if (connection.status !== 'online') {
 		return Promise.reject(new Error('Нет соединения с сервером'));
 	}
 
-	const clientMessageId = crypto.randomUUID();
 	return new Promise((resolve, reject) => {
 		pending.set(clientMessageId, { resolve, reject });
 		send({ method: 'sendMessage', chatId, clientMessageId, content: { text } });
@@ -72,14 +73,15 @@ function open() {
 		}
 
 		socket = null;
-		authorized = false;
+		connection.status = 'offline';
 		for (const request of pending.values()) {
 			request.reject(new Error('Соединение потеряно'));
 		}
 		pending.clear();
 
 		if (active) {
-			reconnectTimer = setTimeout(open, reconnectDelay);
+			const delay = reconnectDelay.min + Math.random() * (reconnectDelay.max - reconnectDelay.min);
+			reconnectTimer = setTimeout(open, delay);
 		}
 	};
 }
@@ -95,10 +97,14 @@ function authorize() {
 function handle(event: ServerEvent) {
 	switch (event.method) {
 		case 'authorizeResponse':
-			authorized = event.success;
 			if (!event.success) {
 				refresh();
+				break;
 			}
+			if (connection.status === 'offline') {
+				showAlert('success', 'Соединение восстановлено');
+			}
+			connection.status = 'online';
 			break;
 		case 'requireAuthorize':
 			refresh().then((ok) => ok && authorize());
