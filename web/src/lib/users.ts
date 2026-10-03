@@ -10,7 +10,9 @@ const users = new Map<string, Promise<User>>();
 
 export function getUser(userId: string): Promise<User> {
 	if (!users.has(userId)) {
-		users.set(userId, fetchUser(userId));
+		const request = fetchUser(userId);
+		users.set(userId, request);
+		request.catch(() => users.delete(userId));
 	}
 
 	return users.get(userId)!;

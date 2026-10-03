@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { v4 as uuid } from 'uuid';
 	import Page from '../components/Page.svelte';
 	import Button from '../components/Button.svelte';
@@ -41,6 +42,7 @@
 	let feed: HTMLDivElement;
 	let scrolledUp = $state(false);
 	let unseen = $state(0);
+	let currentChatId: string | null = null;
 
 	const newestFirst = $derived([...messages, ...pending].reverse());
 
@@ -75,15 +77,22 @@
 		return messages.at(-1)?.seqnum ?? 0;
 	}
 
-	async function load(chatId: string) {
+	async function load(chatId: string): Promise<boolean> {
 		try {
-			chat = await getChat(chatId);
-			const page = await getMessages(chatId, 'before', chat.lastSeqnum + 1);
+			const loaded = await getChat(chatId);
+			const page = await getMessages(chatId, 'before', loaded.lastSeqnum + 1);
+			if (chatId !== currentChatId) {
+				return false;
+			}
+
 			addMessages(page.messages.map(toBubble));
 			hasMore = page.hasMore;
 			freshFrom = lastSeqnum() + 1;
+			chat = loaded;
+			return true;
 		} catch (err) {
 			showAlert('error', (err as Error).message);
+			return false;
 		}
 	}
 
@@ -99,8 +108,16 @@
 
 	async function loadNewer(chatId: string, after: number) {
 		try {
-			const page = await getMessages(chatId, 'after', after);
-			addMessages(page.messages.map(toBubble));
+			let page;
+			do {
+				page = await getMessages(chatId, 'after', after);
+				if (chatId !== currentChatId) {
+					return;
+				}
+
+				addMessages(page.messages.map(toBubble));
+				after = page.messages.at(-1)?.seqnum ?? after;
+			} while (page.hasMore && page.messages.length > 0);
 		} catch (err) {
 			showAlert('error', (err as Error).message);
 		}
@@ -108,17 +125,29 @@
 
 	$effect(() => {
 		const chatId = params.id;
+		let ready = false;
 
+		currentChatId = chatId;
 		chat = null;
 		messages = [];
 		pending = [];
 		hasMore = false;
 		freshFrom = Infinity;
-		load(chatId);
-		setOpenedChat(chatId);
+		untrack(() => {
+			setOpenedChat(chatId);
+
+			load(chatId).then((loaded) => {
+				if (!loaded) {
+					return;
+				}
+
+				ready = true;
+				loadNewer(chatId, lastSeqnum());
+			});
+		});
 
 		const unsubscribe = subscribe((event) => {
-			if (!chat) {
+			if (!ready) {
 				return;
 			}
 
@@ -141,6 +170,7 @@
 		return () => {
 			unsubscribe();
 			setOpenedChat(null);
+			currentChatId = null;
 		};
 	});
 
