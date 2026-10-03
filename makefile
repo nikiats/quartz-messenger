@@ -1,4 +1,4 @@
-.PHONY: gen sqlc build migrate-up migrate-down migrate-status migrate-create web-dev up down
+.PHONY: gen sqlc build migrate-up migrate-down migrate-status migrate-create web-dev up down scylla-up scylla-down cqlsh
 
 -include deploy/messenger.env
 
@@ -34,3 +34,12 @@ up:
 
 down:
 	docker compose down
+
+scylla-up:
+	docker compose -f docker-compose.scylla.yml up -d
+
+scylla-down:
+	docker compose -f docker-compose.scylla.yml down
+
+cqlsh:
+	docker compose -f docker-compose.scylla.yml exec scylla cqlsh
