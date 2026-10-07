@@ -1,0 +1,38 @@
+name: quaztz-cassandra
+
+services:
+  cassandra:
+    image: cassandra:5
+    restart: unless-stopped
+    environment:
+      CASSANDRA_CLUSTER_NAME: quaztz
+      MAX_HEAP_SIZE: 1G
+      HEAP_NEWSIZE: 200M
+    ports:
+      - "9042:9042"
+    volumes:
+      - cassandra-data:/var/lib/cassandra
+    healthcheck:
+      test: ["CMD-SHELL", "cqlsh -e 'DESCRIBE KEYSPACES' > /dev/null"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 60s
+
+  cassandra-web:
+    image: ipushc/cassandra-web:latest
+    restart: unless-stopped
+    environment:
+      HOST_PORT: ":80"
+      CASSANDRA_HOST: cassandra
+      CASSANDRA_PORT: 9042
+      CASSANDRA_USERNAME: cassandra
+      CASSANDRA_PASSWORD: cassandra
+    ports:
+      - "${CASSANDRA_WEB_PORT:-8090}:80"
+    depends_on:
+      cassandra:
+        condition: service_healthy
+
+volumes:
+  cassandra-data:
