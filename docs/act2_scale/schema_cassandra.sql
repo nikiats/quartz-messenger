@@ -2,7 +2,7 @@
 
 -- общие настройки базы данных
 CREATE KEYSPACE IF NOT EXISTS quaztz
-    WITH replication = {'class': 'NetworkTopologyStrategy', 'replication_factor': 3};
+    WITH replication = {'class': 'NetworkTopologyStrategy', 'replication_factor': 1};
 
 USE quaztz;
 
@@ -17,7 +17,6 @@ CREATE TABLE IF NOT EXISTS messages (
     message_id        bigint,
     sender_id         uuid,
     content           text,
-    client_message_id uuid,       -- защита от дупликатов отправки
     edited_at         timestamp,
     deleted           boolean,    -- удаление отметкой
 
@@ -38,39 +37,58 @@ CREATE TABLE IF NOT EXISTS message_buckets (
 ) WITH CLUSTERING ORDER BY (bucket DESC);
 
 -- ============================================================
---  Чаты
+--  Чаты и их участники
 -- ============================================================
 
--- чтение только по chat_id
-CREATE TABLE IF NOT EXISTS chats (
-    chat_id                bigint PRIMARY KEY,
-    type                   text,      -- 'private' | 'group'
-    title                  text,      -- название (группа);
-    user_a                 uuid,      -- участник 1 (личный чат);
-    user_b                 uuid,      -- участник 2 (личный чат);
-    admin_id               uuid,      -- администратор (группа);
-    deleted                boolean,   -- мягкое удаление
+-- участники чата, партиция - один чат
 
-	-- для отображения preview
-    last_message_id        bigint,
-    last_message_sender_id uuid,
-    last_message_preview   text
-);
+-- чат описывается static столбцами:
+-- * chat_id
+-- * type
+-- * title
+-- * user_a
+-- * user_b
+-- * admin_id
+-- * deleted
 
--- ============================================================
---  Участники чатов
--- ============================================================
+-- участник чата описывается
+-- * user_id
+-- * joined_at
 
--- под запрос участников чата
+-- для согласованности изменений хранится "версия" чата
+-- * version
+
 CREATE TABLE IF NOT EXISTS chat_members (
     chat_id   bigint,
     user_id   uuid,
     joined_at timestamp,
 
+    type      text    static,   -- 'private' | 'group'
+    title     text    static,   -- название (группа)
+    user_a    uuid    static,   -- участник 1 (личный чат)
+    user_b    uuid    static,   -- участник 2 (личный чат)
+    admin_id  uuid    static,   -- администратор (группа)
+    deleted   boolean static,   -- мягкое удаление
+    version   int     static,   -- номер редакции чата для LWT
+
+    -- партиция - чат
+    -- сортировка - по user_id
     PRIMARY KEY ((chat_id), user_id)
 );
 
--- под запрос чатов пользователя
+-- ============================================================
+--  Последнее сообщение чата
+-- ============================================================
+
+-- для отображения preview чатов
+CREATE TABLE IF NOT EXISTS chat_activity (
+    chat_id                bigint PRIMARY KEY,
+    last_message_id        bigint,
+    last_message_sender_id uuid,
+    last_message_preview   text
+);
+
+-- для отображения чатов пользователя
 CREATE TABLE IF NOT EXISTS user_chats (
     user_id   uuid,
     chat_id   bigint,
