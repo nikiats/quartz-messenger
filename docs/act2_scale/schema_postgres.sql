@@ -1,4 +1,4 @@
--- PostgreSQL: пользователи и сессии.
+-- PostgreSQL / Citus: пользователи и сессии.
 
 CREATE EXTENSION IF NOT EXISTS citext;
 
@@ -6,14 +6,31 @@ CREATE EXTENSION IF NOT EXISTS citext;
 --  Пользователи
 -- ============================================================
 
+-- распределение по id
 CREATE TABLE users (
     id            UUID        PRIMARY KEY,
-    login         CITEXT      NOT NULL UNIQUE,
+    login         CITEXT      NOT NULL,
     password_hash TEXT        NOT NULL,
-    username      CITEXT      UNIQUE,
-    visible_name  TEXT        NOT NULL DEFAULT 'Пользователь',        
+    username      CITEXT,
+    visible_name  TEXT        NOT NULL DEFAULT 'Пользователь',
     suspended     BOOLEAN     NOT NULL DEFAULT FALSE,
     created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- ============================================================
+--  Уникальные индексы пользователей
+-- ============================================================
+
+-- распределение по login, уникальность логина
+CREATE TABLE user_logins (
+    login   CITEXT PRIMARY KEY,
+    user_id UUID   NOT NULL
+);
+
+-- распределение по username, уникальность юзернейма
+CREATE TABLE usernames (
+    username CITEXT PRIMARY KEY,
+    user_id  UUID   NOT NULL
 );
 
 -- ============================================================
@@ -21,12 +38,21 @@ CREATE TABLE users (
 -- ============================================================
 
 CREATE TABLE sessions (
-    id                 UUID        PRIMARY KEY,
     user_id            UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    refresh_token_hash TEXT        NOT NULL UNIQUE,  -- хранится хеш, не сам токен
-    expires_at         TIMESTAMPTZ NOT NULL,         -- срок жизни токена обновления
+    id                 UUID        NOT NULL,
+    refresh_token_hash TEXT        NOT NULL,         -- хранится хеш
+    expires_at         TIMESTAMPTZ NOT NULL,         -- срок жизни токена
     created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
-    revoked_at         TIMESTAMPTZ DEFAULT NULL
+    revoked_at         TIMESTAMPTZ DEFAULT NULL,
+
+    PRIMARY KEY (user_id, id)
 );
 
-CREATE INDEX sessions_user_id_idx ON sessions (user_id);
+-- ============================================================
+--  Распределение (только Citus)
+-- ============================================================
+
+-- SELECT create_distributed_table('users',       'id');
+-- SELECT create_distributed_table('sessions',    'user_id', colocate_with => 'users');
+-- SELECT create_distributed_table('user_logins', 'login');
+-- SELECT create_distributed_table('usernames',   'username');
