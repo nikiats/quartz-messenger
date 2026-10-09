@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 
+	"quaztz/internal/platform/rediskey"
 	"quaztz/internal/platform/token"
 )
 
@@ -32,8 +33,33 @@ func NewAuth(rdb *redis.Client, verifier *token.Verifier) *Auth {
 	return &Auth{rdb: rdb, verifier: verifier}
 }
 
-// TODO: verifier.Verify(accessToken, token.Access), затем проверка token.RevokedKey(sessionId) в Redis (операция 21)
 func (a *Auth) ValidateSession(ctx context.Context, accessToken string) (Session, error) {
+	claims, err := a.verifier.Verify(accessToken, token.Access)
+	if err != nil {
+		return Session{}, ErrSessionIncorrect
+	}
 
-	return Session{}, ErrInternal
+	revoked, err := a.IsRevoked(ctx, claims.SessionID)
+	if err != nil {
+		return Session{}, err
+	}
+	if revoked {
+		return Session{}, ErrSessionIncorrect
+	}
+
+	return Session{
+		UserID:    claims.UserID,
+		SessionID: claims.SessionID,
+		ExpiresAt: claims.ExpiresAt,
+	}, nil
+}
+
+func (a *Auth) IsRevoked(ctx context.Context, sessionID uuid.UUID) (bool, error) {
+	n, err := a.rdb.Exists(ctx, rediskey.Revoked(sessionID)).Result()
+
+	if err != nil {
+		return false, ErrInternal
+	}
+
+	return n > 0, nil
 }

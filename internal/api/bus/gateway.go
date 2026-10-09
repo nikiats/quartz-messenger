@@ -8,11 +8,12 @@ import (
 
 // SubjectUserMessage
 type MessageEvent struct {
-	ChatID    int64          `json:"chatId"`
-	MessageID int64          `json:"messageId"`
-	SenderID  uuid.UUID      `json:"senderId"`
-	Content   MessageContent `json:"content"`
-	SentAt    time.Time      `json:"sentAt"`
+	ChatID       uuid.UUID      `json:"chatId"`
+	SenderID     uuid.UUID      `json:"senderId"`
+	Seqnum       int64          `json:"seqnum"`
+	Content      MessageContent `json:"content"`
+	SentAt       time.Time      `json:"sentAt"`
+	RecepientIDs []uuid.UUID    `json:"recepientIds"`
 }
 
 // SubjectSessionRevoked

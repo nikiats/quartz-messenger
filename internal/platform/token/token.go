@@ -29,7 +29,3 @@ type jwtClaims struct {
 	Type      string    `json:"typ"`
 	jwt.RegisteredClaims
 }
-
-func RevokedKey(sessionID uuid.UUID) string {
-	return "revoked:" + sessionID.String()
-}

@@ -15,9 +15,9 @@ const (
 	SubjectSessionRevoked = "gateway.session.revoked"
 )
 
-// события мессенджера для пользователя, на них подписан шлюз с его соединениями
-func SubjectUserMessage(userID uuid.UUID) string {
-	return "gateway.user." + userID.String() + ".message"
+// события мессенджера для шлюза
+func SubjectGatewayMessage(gatewayID uuid.UUID) string {
+	return "gateway." + gatewayID.String() + ".message"
 }
 
 // коды ошибок ответа в заголовке Nats-Service-Error-Code
