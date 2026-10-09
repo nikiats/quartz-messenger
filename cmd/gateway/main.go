@@ -16,8 +16,10 @@ import (
 	natstransport "quaztz/internal/gateway/transport/nats"
 	"quaztz/internal/gateway/transport/ws"
 	loader "quaztz/internal/platform/config"
+	"quaztz/internal/platform/rediskey"
 	"quaztz/internal/platform/token"
 
+	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
 	"github.com/redis/go-redis/v9"
 )
@@ -32,11 +34,16 @@ func main() {
 }
 
 func run() error {
+	// загрузка конфигурации
 	var cfg config.Config
 	if err := loader.Load(&cfg, "deploy/gateway.env"); err != nil {
 		return err
 	}
 
+	// ID шлюза
+	gatewayID := uuid.New()
+
+	// graceful stop (1)
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
@@ -61,22 +68,43 @@ func run() error {
 		return err
 	}
 
+	// обновление записи об активности шлюза
+	key := rediskey.Gateway(gatewayID)
+	if err := rdb.Set(ctx, key, "1", time.Second*2).Err(); err != nil {
+		return err
+	}
+	ticker := time.NewTicker(time.Second)
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				if err := rdb.Set(ctx, key, "1", time.Second*2).Err(); err != nil {
+					slog.Warn("gateway heartbeat failed", "error", err)
+				}
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	defer rdb.Del(context.Background(), key)
+
 	// in-memory регистр открытых соединений
 	registry := connection.NewRegistry()
 
 	// сервисы шлюза
 	auth := service.NewAuth(rdb, token.NewVerifier(cfg.JWTSecret))
 	messenger := service.NewMessenger(nc)
+	presence := service.NewPresence(rdb, gatewayID)
 
 	// прием событий мессенджера
 	subscriber := natstransport.NewSubscriber(nc, registry)
-	if err := subscriber.Start(); err != nil {
+	if err := subscriber.Start(gatewayID); err != nil {
 		return err
 	}
 
 	// запуск WebSocket сервера
 	public := http.NewServeMux()
-	public.Handle("GET /ws", ws.NewHandler(auth, messenger, registry, cfg.OriginPatterns))
+	public.Handle("GET /ws", ws.NewHandler(auth, messenger, presence, registry, cfg.OriginPatterns))
 	wsServer := &http.Server{
 		Addr:              cfg.WSAddress,
 		Handler:           public,
@@ -96,9 +124,9 @@ func run() error {
 	case <-ctx.Done():
 	}
 
+	// graceful stop (2)
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
-
 	if err := wsServer.Shutdown(shutdownCtx); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}

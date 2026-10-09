@@ -47,12 +47,17 @@ func (r *Registry) Add(conn Conn) {
 	add(r.bySession, conn.SessionID(), conn)
 }
 
-func (r *Registry) Remove(conn Conn) {
+// возвращает true, если удалено последнее соединение пользователя
+func (r *Registry) Remove(conn Conn) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	_, found := r.byUser[conn.UserID()][conn]
+
 	removeConnection(r.byUser, conn.UserID(), conn)
 	removeConnection(r.bySession, conn.SessionID(), conn)
+
+	return found && len(r.byUser[conn.UserID()]) == 0
 }
 
 func (r *Registry) Deliver(userID uuid.UUID, msg Message) {
@@ -61,19 +66,9 @@ func (r *Registry) Deliver(userID uuid.UUID, msg Message) {
 	}
 }
 
+// соединения удаляются из регистра через Remove при завершении их работы
 func (r *Registry) CloseSession(sessionID uuid.UUID) {
-	r.mu.Lock()
-
-	// удаление соединений из регистра соединений
-	conns := slices.Collect(maps.Keys(r.bySession[sessionID]))
-	for _, conn := range conns {
-		removeConnection(r.byUser, conn.UserID(), conn)
-		removeConnection(r.bySession, sessionID, conn)
-	}
-
-	r.mu.Unlock()
-
-	for _, conn := range conns {
+	for _, conn := range r.getConnections(r.bySession, sessionID) {
 		go conn.Close("session revoked")
 	}
 }

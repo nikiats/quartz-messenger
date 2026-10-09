@@ -12,14 +12,22 @@ import (
 type Handler struct {
 	auth           *service.Auth
 	messenger      *service.Messenger
+	presence       *service.Presence
 	registry       *connection.Registry
 	originPatterns []string
 }
 
-func NewHandler(a *service.Auth, m *service.Messenger, r *connection.Registry, originPattern []string) *Handler {
+func NewHandler(
+	a *service.Auth,
+	m *service.Messenger,
+	p *service.Presence,
+	r *connection.Registry,
+	originPattern []string,
+) *Handler {
 	return &Handler{
 		auth:           a,
 		messenger:      m,
+		presence:       p,
 		registry:       r,
 		originPatterns: originPattern,
 	}
@@ -39,6 +47,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		wsConn:    conn,
 		auth:      h.auth,
 		messenger: h.messenger,
+		presence:  h.presence,
 		registry:  h.registry,
 	}
 

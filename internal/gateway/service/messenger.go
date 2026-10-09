@@ -58,7 +58,7 @@ func (m *Messenger) SendMessage(ctx context.Context, message Message) (Sent, err
 	}
 
 	// отправка в NATS
-	ctx, cancel := context.WithTimeout(ctx, time.Second)
+	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
 	msg, err := m.nc.RequestWithContext(ctx, bus.SubjectSendMessage, data)
 	if err != nil {
@@ -82,5 +82,5 @@ func (m *Messenger) SendMessage(ctx context.Context, message Message) (Sent, err
 	return Sent{
 		Seqnum: resp.Seqnum,
 		SentAt: resp.SentAt,
-	}, ErrInternal
+	}, nil
 }

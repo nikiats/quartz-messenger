@@ -13,6 +13,7 @@ const (
 // события мессенджера для всех инстансов шлюза (broadcast)
 const (
 	SubjectSessionRevoked = "gateway.session.revoked"
+	SubjectReceiveMessage = "gateway.message.received"
 )
 
 // события мессенджера для шлюза

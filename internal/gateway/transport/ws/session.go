@@ -26,6 +26,7 @@ type clientSession struct {
 	wsConn    *websocket.Conn
 	auth      *service.Auth
 	messenger *service.Messenger
+	presence  *service.Presence
 	registry  *connection.Registry
 
 	userID    uuid.UUID
@@ -101,9 +102,16 @@ func (s *clientSession) Close(reason string) {
 	_ = s.wsConn.Close(websocket.StatusPolicyViolation, reason)
 }
 
+// удаление из регистра и, если соединение последнее, из Redis
+func (s *clientSession) unregister() {
+	if s.registry.Remove(s) {
+		_ = s.presence.Unregister(context.Background(), s.userID)
+	}
+}
+
 // полный цикл работы с WebSocket соединением пользователя
 func (s *clientSession) run(ctx context.Context) {
-	defer s.registry.Remove(s)
+	defer s.unregister()
 	defer s.stopTimers()
 
 	idleTimer := time.AfterFunc(idleTimeout, func() {
@@ -167,40 +175,64 @@ func (s *clientSession) handlePing(ctx context.Context, _ pingRequest) error {
 func (s *clientSession) handleAuthorize(ctx context.Context, req authorizeRequest) error {
 	resp := newAuthorizeResponse(false)
 
+	// проверка токена и не была ли отозвана сессия
 	session, err := s.auth.ValidateSession(ctx, req.Token)
-
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrSessionIncorrect):
 			resp.Error = &errorStruct{
-				Message: "invalid session token",
+				Message: "incorrect credentials",
 				Code:    codeSessionInvalid,
 			}
 		default:
 			resp.Error = ErrorStructInternal
 		}
-		defer s.Close("auth error")
+		defer s.Close("authorization error")
 		return s.send(ctx, resp)
 	}
 
+	// повторная авторизация допускается только для той же сессии
 	if s.isAuthorized() && !s.hasSession(session) {
 		resp.Error = &errorStruct{
 			Message: "session mismatch",
 			Code:    codeSessionMismatch,
 		}
-		defer s.Close("auth error")
+		defer s.Close("authorization error")
 		return s.send(ctx, resp)
 	}
 
-	s.userID = session.UserID
+	// добавление в реестр
 	s.sessionID = session.SessionID
-
-	// TODO: после Add повторно проверить "revoked:{sessionId}" в Redis,
-	// иначе событие отзыва, пришедшее между ValidateSession и Add, будет пропущено
+	s.userID = session.UserID
 	s.registry.Add(s)
 
-	s.setupSessionExpiry(session.ExpiresAt)
+	// проверка, не был ли токен отозван
+	revoked, err := s.auth.IsRevoked(ctx, s.sessionID)
+	if err != nil {
+		resp.Error = ErrorStructInternal
+		defer s.Close("authorization error")
+		return s.send(ctx, resp)
+	}
+	if revoked {
+		s.registry.CloseSession(s.sessionID)
 
+		resp.Error = &errorStruct{
+			Message: "incorrect credentials",
+			Code:    codeSessionInvalid,
+		}
+		defer s.Close("authorization error")
+		return s.send(ctx, resp)
+	}
+
+	// запись о подключении пользователя к шлюзу, повторяется при каждой авторизации
+	if err := s.presence.Register(ctx, s.userID); err != nil {
+		resp.Error = ErrorStructInternal
+		defer s.Close("authorization error")
+		return s.send(ctx, resp)
+	}
+
+	// финальные действия при добавлении сессии
+	s.setupSessionExpiry(session.ExpiresAt)
 	resp.Success = true
 	return s.send(ctx, resp)
 }
