@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"time"
 
 	"github.com/google/uuid"
@@ -44,58 +43,14 @@ type Sent struct {
 }
 
 type Client struct {
-	api *messageprivate.ClientWithResponses
 }
 
-func NewClient(baseURL, token string, maxIdleConns int) (*Client, error) {
-	transport := http.DefaultTransport.(*http.Transport).Clone()
-	transport.MaxIdleConns = maxIdleConns
-	transport.MaxIdleConnsPerHost = maxIdleConns
-
-	authorize := func(_ context.Context, req *http.Request) error {
-		req.Header.Set("Authorization", "Bearer "+token)
-		return nil
-	}
-
-	api, err := messageprivate.NewClientWithResponses(
-		baseURL,
-		messageprivate.WithHTTPClient(&http.Client{
-			Transport: transport,
-			Timeout:   requestTimeout,
-		}),
-		messageprivate.WithRequestEditorFn(authorize),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("messenger client: %w", err)
-	}
-
-	return &Client{api: api}, nil
+func NewClient() (*Client, error) {
+	return &Client{}, nil
 }
 
 func (c *Client) ValidateSession(ctx context.Context, token string) (Session, error) {
-	body := messageprivate.TokenValidate{Token: token}
-
-	resp, err := c.api.ValidateSessionWithResponse(ctx, body)
-	if err != nil {
-		slog.Warn("messengerprivate ValidateSession error", "error", err)
-		return Session{}, ErrInternal
-	}
-	if resp.JSON200 == nil {
-		slog.Warn("messengerprivate ValidateSession error", "code", resp.StatusCode(), "body", string(resp.GetBody()))
-		return Session{}, ErrInternal
-	}
-
-	session := resp.JSON200.Session
-
-	if !resp.JSON200.Success || session == nil {
-		return Session{}, ErrSessionIncorrect
-	}
-
-	return Session{
-		UserID:    session.UserId,
-		SessionID: session.SessionId,
-		ExpiresAt: session.ExpiresAt,
-	}, nil
+	return Session{}, nil
 }
 
 func (c *Client) SendMessage(ctx context.Context, message Message) (Sent, error) {

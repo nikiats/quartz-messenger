@@ -1,4 +1,14 @@
+# Инфраструктура запускается по умолчанию: docker compose up -d
+# Сервисы проекта - профиль app:            docker compose --profile app up -d --build
+# Инструменты (OpenSearch Dashboards) -     docker compose --profile tools up -d
+#
+# Порты инфраструктуры открыты только на 127.0.0.1 - для запуска сервисов локально.
+
 services:
+  # ============================================================
+  #  Хранилище пользователей
+  # ============================================================
+
   postgres:
     image: postgres:18-alpine
     restart: unless-stopped
@@ -6,6 +16,8 @@ services:
       POSTGRES_USER: quaztz
       POSTGRES_PASSWORD: quaztz
       POSTGRES_DB: quaztz
+    ports:
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql
     healthcheck:
@@ -14,7 +26,138 @@ services:
       timeout: 3s
       retries: 10
 
+  # ============================================================
+  #  Хранилище сообщений
+  # ============================================================
+
+  cassandra:
+    image: cassandra:5
+    restart: unless-stopped
+    environment:
+      CASSANDRA_CLUSTER_NAME: quaztz
+      MAX_HEAP_SIZE: 1G
+      HEAP_NEWSIZE: 200M
+    ports:
+      - "127.0.0.1:9042:9042"
+    volumes:
+      - cassandra-data:/var/lib/cassandra
+    healthcheck:
+      test: ["CMD-SHELL", "cqlsh -e 'DESCRIBE KEYSPACES' > /dev/null"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 60s
+
+  # одноразовое применение схемы, все CREATE идемпотентны (IF NOT EXISTS)
+  cassandra-init:
+    image: cassandra:5
+    restart: "no"
+    entrypoint: ["cqlsh", "cassandra", "-f", "/schema/schema.cql"]
+    volumes:
+      - ./docs/act2_scale/schema_cassandra.sql:/schema/schema.cql:ro
+    depends_on:
+      cassandra:
+        condition: service_healthy
+
+  cassandra-web:
+    image: ipushc/cassandra-web:latest
+    restart: unless-stopped
+    environment:
+      HOST_PORT: ":80"
+      CASSANDRA_HOST: cassandra
+      CASSANDRA_PORT: 9042
+      CASSANDRA_USERNAME: cassandra
+      CASSANDRA_PASSWORD: cassandra
+    ports:
+      - "127.0.0.1:${CASSANDRA_WEB_PORT:-8090}:80"
+    depends_on:
+      cassandra:
+        condition: service_healthy
+
+  # ============================================================
+  #  In-memory хранилище
+  # ============================================================
+
+  redis:
+    image: redis:8-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ============================================================
+  #  Pub/sub
+  # ============================================================
+
+  nats:
+    image: nats:2-alpine
+    restart: unless-stopped
+    # -js: JetStream (персистентные потоки), -m: HTTP-мониторинг
+    command: ["-js", "-sd", "/data", "-m", "8222"]
+    ports:
+      - "127.0.0.1:4222:4222"   # клиенты
+      - "127.0.0.1:8222:8222"   # мониторинг: http://localhost:8222
+    volumes:
+      - nats-data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8222/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ============================================================
+  #  Поисковый сервис
+  # ============================================================
+
+  opensearch:
+    image: opensearchproject/opensearch:3
+    restart: unless-stopped
+    environment:
+      discovery.type: single-node
+      OPENSEARCH_JAVA_OPTS: -Xms512m -Xmx512m
+      # без TLS и авторизации - только для локальной разработки
+      DISABLE_SECURITY_PLUGIN: "true"
+      DISABLE_INSTALL_DEMO_CONFIG: "true"
+    ulimits:
+      memlock: { soft: -1, hard: -1 }
+      nofile: { soft: 65536, hard: 65536 }
+    ports:
+      - "127.0.0.1:9200:9200"
+    volumes:
+      - opensearch-data:/usr/share/opensearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:9200/_cluster/health > /dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  opensearch-dashboards:
+    image: opensearchproject/opensearch-dashboards:3
+    profiles: [tools]
+    restart: unless-stopped
+    environment:
+      OPENSEARCH_HOSTS: '["http://opensearch:9200"]'
+      DISABLE_SECURITY_DASHBOARDS_PLUGIN: "true"
+    ports:
+      - "127.0.0.1:5601:5601"
+    depends_on:
+      opensearch:
+        condition: service_healthy
+
+  # ============================================================
+  #  Сервисы проекта
+  # ============================================================
+
   messenger:
+    profiles: [app]
     build:
       context: .
       dockerfile: deploy/go.Dockerfile
@@ -26,6 +169,11 @@ services:
       PRIVATE_HTTP_ADDR: ":8081"
       INTERNAL_TOKEN: change-me
       POSTGRES_URL: postgres://quaztz:quaztz@postgres:5432/quaztz?sslmode=disable
+      CASSANDRA_HOSTS: cassandra:9042
+      CASSANDRA_KEYSPACE: quaztz
+      REDIS_ADDR: redis:6379
+      NATS_URL: nats://nats:4222
+      OPENSEARCH_URL: http://opensearch:9200
       JWT_SECRET: change-me
       ACCESS_TTL: 15m
       REFRESH_TTL: 168h
@@ -39,8 +187,17 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      cassandra-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
 
   gateway:
+    profiles: [app]
     build:
       context: .
       dockerfile: deploy/go.Dockerfile
@@ -53,10 +210,18 @@ services:
       MESSENGER_URL: http://messenger:8081
       MESSENGER_MAX_IDLE_CONNS: 200
       INTERNAL_TOKEN: change-me
+      REDIS_ADDR: redis:6379
+      NATS_URL: nats://nats:4222
       ORIGIN_PATTERNS: localhost
       ACCESS_TTL: 16m
+    depends_on:
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
 
   web:
+    profiles: [app]
     build:
       context: .
       dockerfile: deploy/web.Dockerfile
@@ -69,3 +234,7 @@ services:
 
 volumes:
   postgres-data:
+  cassandra-data:
+  redis-data:
+  nats-data:
+  opensearch-data:

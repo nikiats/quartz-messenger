@@ -1,4 +1,4 @@
-.PHONY: gen sqlc build migrate-up migrate-down migrate-status migrate-create web-dev up down cassandra-up cassandra-down cqlsh
+.PHONY: gen sqlc build migrate-up migrate-down migrate-status migrate-create web-dev infra-up up down cqlsh
 
 -include deploy/messenger.env
 
@@ -29,17 +29,15 @@ migrate-create:
 web-dev:
 	cd web && npm run dev
 
+# инфраструктура без сервисов проекта
+infra-up:
+	docker compose up -d
+
 up:
-	docker compose up --build -d
+	docker compose --profile app up --build -d
 
 down:
-	docker compose down
-
-cassandra-up:
-	docker compose -f docker-compose.cassandra.yml up -d
-
-cassandra-down:
-	docker compose -f docker-compose.cassandra.yml down
+	docker compose --profile app --profile tools down
 
 cqlsh:
-	docker compose -f docker-compose.cassandra.yml exec cassandra cqlsh
+	docker compose exec cassandra cqlsh
