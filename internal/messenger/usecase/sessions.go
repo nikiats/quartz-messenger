@@ -17,7 +17,6 @@ type Sessions struct {
 	r          SessionRepository
 	users      UserRepository
 	gateway    Gateway
-	revoked    *revokedSessions
 	issuer     *token.Issuer
 	verifier   *token.Verifier
 	accessTTL  time.Duration
@@ -36,25 +35,11 @@ func NewSessions(
 		r:          r,
 		users:      users,
 		gateway:    gateway,
-		revoked:    newRevokedSessions(accessTTL),
 		issuer:     issuer,
 		verifier:   verifier,
 		accessTTL:  accessTTL,
 		refreshTTL: refreshTTL,
 	}
-}
-
-func (s *Sessions) LoadRevoked(ctx context.Context) error {
-	revoked, err := s.r.GetRevokedSessions(ctx, time.Now().Add(-s.accessTTL))
-	if err != nil {
-		return err
-	}
-
-	for sessionID, revokedAt := range revoked {
-		s.revoked.add(sessionID, revokedAt)
-	}
-
-	return nil
 }
 
 func (s *Sessions) Login(ctx context.Context, login, password string) (domain.Session, domain.Tokens, error) {
@@ -129,10 +114,7 @@ func (s *Sessions) Revoke(ctx context.Context, userID, sessionID uuid.UUID) erro
 		return err
 	}
 
-	s.revoked.add(sessionID, time.Now())
-	_ = s.gateway.InvalidateSession(ctx, sessionID)
-
-	return nil
+	return s.gateway.InvalidateSession(ctx, sessionID)
 }
 
 func (s *Sessions) Authenticate(ctx context.Context, accessToken string) (domain.Session, error) {
@@ -149,8 +131,12 @@ func (s *Sessions) Authenticate(ctx context.Context, accessToken string) (domain
 	return session, nil
 }
 
-func (s *Sessions) CheckRevoked(_ context.Context, sessionID uuid.UUID) error {
-	if s.revoked.contains(sessionID) {
+func (s *Sessions) CheckRevoked(ctx context.Context, sessionID uuid.UUID) error {
+	revoked, err := s.gateway.IsRevoked(ctx, sessionID)
+	if err != nil {
+		return err
+	}
+	if revoked {
 		return domain.ErrSessionRevoked
 	}
 

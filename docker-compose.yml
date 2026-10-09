@@ -1,6 +1,6 @@
 # Инфраструктура запускается по умолчанию: docker compose up -d
 # Сервисы проекта - профиль app:            docker compose --profile app up -d --build
-# Инструменты (OpenSearch Dashboards) -     docker compose --profile tools up -d
+# Инструменты (OpenSearch Dashboards, RedisInsight, NUI) - docker compose --profile tools up -d
 #
 # Порты инфраструктуры открыты только на 127.0.0.1 - для запуска сервисов локально.
 
@@ -92,6 +92,20 @@ services:
       timeout: 3s
       retries: 10
 
+  redisinsight:
+    image: redis/redisinsight:latest
+    profiles: [tools]
+    restart: unless-stopped
+    environment:
+      RI_REDIS_HOST: redis
+      RI_REDIS_PORT: 6379
+      RI_REDIS_ALIAS: quaztz
+    ports:
+      - "127.0.0.1:5540:5540"
+    depends_on:
+      redis:
+        condition: service_healthy
+
   # ============================================================
   #  Pub/sub
   # ============================================================
@@ -111,6 +125,16 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  nui:
+    image: ghcr.io/nats-nui/nui:latest
+    profiles: [tools]
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:31311:31311"
+    depends_on:
+      nats:
+        condition: service_healthy
 
   # ============================================================
   #  Поисковый сервис

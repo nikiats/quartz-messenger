@@ -71,10 +71,14 @@ func (m *Messages) deliver(ctx context.Context, message domain.Message) {
 		return
 	}
 
+	recipientIDs := make([]uuid.UUID, 0, len(members))
 	for _, member := range members {
-		if member.UserID == message.SenderID {
-			continue
+		if member.UserID != message.SenderID {
+			recipientIDs = append(recipientIDs, member.UserID)
 		}
-		_ = m.gateway.DeliverMessage(ctx, member.UserID, message)
+	}
+
+	if err := m.gateway.DeliverMessage(ctx, recipientIDs, message); err != nil {
+		slog.Warn("message delivery failed", "chat", message.ChatID, "error", err)
 	}
 }

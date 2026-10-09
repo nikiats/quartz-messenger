@@ -88,16 +88,3 @@ func (r *Sessions) RevokeSession(ctx context.Context, userID, sessionID uuid.UUI
 	}
 	return nil
 }
-
-func (r *Sessions) GetRevokedSessions(ctx context.Context, since time.Time) (map[uuid.UUID]time.Time, error) {
-	rows, err := r.q.GetRevokedSessions(ctx, since)
-	if err != nil {
-		return nil, err
-	}
-
-	revoked := make(map[uuid.UUID]time.Time, len(rows))
-	for _, row := range rows {
-		revoked[row.ID] = *row.RevokedAt
-	}
-	return revoked, nil
-}

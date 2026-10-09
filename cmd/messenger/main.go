@@ -18,6 +18,7 @@ import (
 
 	"github.com/alexedwards/argon2id"
 	"github.com/nats-io/nats.go"
+	"github.com/redis/go-redis/v9"
 )
 
 func main() {
@@ -61,8 +62,15 @@ func run() error {
 	}
 	defer nc.Drain()
 
+	// соединение с Redis
+	rdb := redis.NewClient(&redis.Options{Addr: cfg.RedisAddr})
+	defer rdb.Close()
+	if err := rdb.Ping(ctx).Err(); err != nil {
+		return err
+	}
+
 	// клиент к gateway service
-	gatewayClient := gateway.NewClient(nc)
+	gatewayClient := gateway.NewClient(nc, rdb, cfg.AccessTTL)
 
 	// создание сущностей слоя repository
 	messengerRepository := postgres.NewMessenger(pool)
@@ -79,12 +87,6 @@ func run() error {
 		cfg.AccessTTL,
 		cfg.RefreshTTL,
 	)
-	// загрузка неистекших отозванных сессий в in-memory
-	// хранилище для быстрой проверки при каждом запросе
-	if err := sessions.LoadRevoked(ctx); err != nil {
-		return err
-	}
-
 	// usecase: работа с пользователями, чатами, сообщениями
 	passwordParams := argon2id.Params(cfg.Argon2)
 	users := usecase.NewUsers(userRepository, &passwordParams)

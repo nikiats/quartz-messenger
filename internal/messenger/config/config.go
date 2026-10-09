@@ -9,6 +9,7 @@ type Config struct {
 	AccessTTL   time.Duration `env:"ACCESS_TTL,notEmpty"`
 	RefreshTTL  time.Duration `env:"REFRESH_TTL,notEmpty"`
 	NATSUrl     string        `env:"NATS_URL,notEmpty"`
+	RedisAddr   string        `env:"REDIS_ADDR,notEmpty"`
 	Argon2      Argon2        `envPrefix:"ARGON2_"`
 }
 

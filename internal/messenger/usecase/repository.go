@@ -44,5 +44,4 @@ type SessionRepository interface {
 		expiresAt time.Time,
 	) (domain.Session, error)
 	RevokeSession(ctx context.Context, userID, sessionID uuid.UUID) error
-	GetRevokedSessions(ctx context.Context, since time.Time) (map[uuid.UUID]time.Time, error)
 }
