@@ -166,8 +166,6 @@ services:
     restart: unless-stopped
     environment:
       PUBLIC_HTTP_ADDR: ":8080"
-      PRIVATE_HTTP_ADDR: ":8081"
-      INTERNAL_TOKEN: change-me
       POSTGRES_URL: postgres://quaztz:quaztz@postgres:5432/quaztz?sslmode=disable
       CASSANDRA_HOSTS: cassandra:9042
       CASSANDRA_KEYSPACE: quaztz
@@ -177,8 +175,6 @@ services:
       JWT_SECRET: change-me
       ACCESS_TTL: 15m
       REFRESH_TTL: 168h
-      GATEWAY_URL: http://gateway:9081
-      GATEWAY_MAX_IDLE_CONNS: 200
       ARGON2_MEMORY: 8
       ARGON2_ITERATIONS: 1
       ARGON2_PARALLELISM: 1
@@ -206,14 +202,10 @@ services:
     restart: unless-stopped
     environment:
       WS_ADDR: ":9080"
-      PRIVATE_HTTP_ADDR: ":9081"
-      MESSENGER_URL: http://messenger:8081
-      MESSENGER_MAX_IDLE_CONNS: 200
-      INTERNAL_TOKEN: change-me
       REDIS_ADDR: redis:6379
       NATS_URL: nats://nats:4222
+      JWT_SECRET: change-me
       ORIGIN_PATTERNS: localhost
-      ACCESS_TTL: 16m
     depends_on:
       redis:
         condition: service_healthy

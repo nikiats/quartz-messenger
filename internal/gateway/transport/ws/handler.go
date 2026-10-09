@@ -6,17 +6,19 @@ import (
 	"github.com/coder/websocket"
 
 	"quaztz/internal/gateway/connection"
-	"quaztz/internal/gateway/messenger"
+	"quaztz/internal/gateway/service"
 )
 
 type Handler struct {
-	messenger      *messenger.Client
+	auth           *service.Auth
+	messenger      *service.Messenger
 	registry       *connection.Registry
 	originPatterns []string
 }
 
-func NewHandler(m *messenger.Client, r *connection.Registry, originPattern []string) *Handler {
+func NewHandler(a *service.Auth, m *service.Messenger, r *connection.Registry, originPattern []string) *Handler {
 	return &Handler{
+		auth:           a,
 		messenger:      m,
 		registry:       r,
 		originPatterns: originPattern,
@@ -35,6 +37,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	connSession := &clientSession{
 		wsConn:    conn,
+		auth:      h.auth,
 		messenger: h.messenger,
 		registry:  h.registry,
 	}

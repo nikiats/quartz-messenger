@@ -48,7 +48,7 @@
 9. Выполнить вставку `(chatId, bucket)` в Cassandra `message_buckets`.
 10. Обновить Cassandra `chat_activity` для `chatId` с меткой времени записи `USING TIMESTAMP`, равной `sentAt`.
 11. Опубликовать в pub/sub событие о новом сообщении в чате `chatId`.
-12. Проиндексировать сообщение в OpenSearch.
+12. Опубликовать в JetStream событие для асинхронной индексации сообщения в OpenSearch.
 13. Вернуть `messageId` и `sentAt`.
 
 ### 3. Создание личного чата

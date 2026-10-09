@@ -6,30 +6,20 @@ import (
 	"encoding/hex"
 	"errors"
 	"quaztz/internal/messenger/domain"
+	"quaztz/internal/platform/token"
 	"time"
 
 	"github.com/alexedwards/argon2id"
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 )
-
-const (
-	tokenAccess  = "access"
-	tokenRefresh = "refresh"
-)
-
-type tokenClaims struct {
-	SessionID uuid.UUID `json:"sid"`
-	Type      string    `json:"typ"`
-	jwt.RegisteredClaims
-}
 
 type Sessions struct {
 	r          SessionRepository
 	users      UserRepository
 	gateway    Gateway
 	revoked    *revokedSessions
-	secret     []byte
+	issuer     *token.Issuer
+	verifier   *token.Verifier
 	accessTTL  time.Duration
 	refreshTTL time.Duration
 }
@@ -38,7 +28,8 @@ func NewSessions(
 	r SessionRepository,
 	users UserRepository,
 	gateway Gateway,
-	secret string,
+	issuer *token.Issuer,
+	verifier *token.Verifier,
 	accessTTL, refreshTTL time.Duration,
 ) *Sessions {
 	return &Sessions{
@@ -46,7 +37,8 @@ func NewSessions(
 		users:      users,
 		gateway:    gateway,
 		revoked:    newRevokedSessions(accessTTL),
-		secret:     []byte(secret),
+		issuer:     issuer,
+		verifier:   verifier,
 		accessTTL:  accessTTL,
 		refreshTTL: refreshTTL,
 	}
@@ -107,7 +99,7 @@ func (s *Sessions) Login(ctx context.Context, login, password string) (domain.Se
 }
 
 func (s *Sessions) Refresh(ctx context.Context, refreshToken string) (domain.Tokens, error) {
-	session, err := s.parse(refreshToken, tokenRefresh)
+	session, err := s.parse(refreshToken, token.Refresh)
 	if err != nil {
 		return domain.Tokens{}, err
 	}
@@ -144,7 +136,7 @@ func (s *Sessions) Revoke(ctx context.Context, userID, sessionID uuid.UUID) erro
 }
 
 func (s *Sessions) Authenticate(ctx context.Context, accessToken string) (domain.Session, error) {
-	session, err := s.parse(accessToken, tokenAccess)
+	session, err := s.parse(accessToken, token.Access)
 	if err != nil {
 		return domain.Session{}, err
 	}
@@ -166,12 +158,12 @@ func (s *Sessions) CheckRevoked(_ context.Context, sessionID uuid.UUID) error {
 }
 
 func (s *Sessions) createTokens(session domain.Session, now time.Time) (domain.Tokens, error) {
-	access, err := s.sign(session, tokenAccess, now.Add(s.accessTTL))
+	access, err := s.sign(session, token.Access, now.Add(s.accessTTL))
 	if err != nil {
 		return domain.Tokens{}, err
 	}
 
-	refresh, err := s.sign(session, tokenRefresh, now.Add(s.refreshTTL))
+	refresh, err := s.sign(session, token.Refresh, now.Add(s.refreshTTL))
 	if err != nil {
 		return domain.Tokens{}, err
 	}
@@ -183,46 +175,27 @@ func (s *Sessions) createTokens(session domain.Session, now time.Time) (domain.T
 }
 
 func (s *Sessions) sign(session domain.Session, tokenType string, expiresAt time.Time) (string, error) {
-	claims := tokenClaims{
+	return s.issuer.Issue(tokenType, token.Claims{
+		UserID:    session.UserID,
 		SessionID: session.SessionID,
-		Type:      tokenType,
-		RegisteredClaims: jwt.RegisteredClaims{
-			ID:        uuid.NewString(),
-			Subject:   session.UserID.String(),
-			ExpiresAt: jwt.NewNumericDate(expiresAt),
-		},
-	}
-
-	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(s.secret)
+		ExpiresAt: expiresAt,
+	})
 }
 
-func (s *Sessions) parse(token, tokenType string) (domain.Session, error) {
-	var claims tokenClaims
-
-	_, err := jwt.ParseWithClaims(
-		token,
-		&claims,
-		func(*jwt.Token) (any, error) { return s.secret, nil },
-		jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}),
-		jwt.WithExpirationRequired(),
-	)
+func (s *Sessions) parse(raw, tokenType string) (domain.Session, error) {
+	claims, err := s.verifier.Verify(raw, tokenType)
 
 	switch {
-	case errors.Is(err, jwt.ErrTokenExpired):
+	case errors.Is(err, token.ErrExpired):
 		return domain.Session{}, domain.ErrTokenExpired
 	case err != nil:
 		return domain.Session{}, domain.ErrTokenInvalid
 	}
 
-	userID, err := uuid.Parse(claims.Subject)
-	if err != nil || claims.Type != tokenType {
-		return domain.Session{}, domain.ErrTokenInvalid
-	}
-
 	return domain.Session{
-		UserID:    userID,
+		UserID:    claims.UserID,
 		SessionID: claims.SessionID,
-		ExpiresAt: claims.ExpiresAt.Time,
+		ExpiresAt: claims.ExpiresAt,
 	}, nil
 }
 

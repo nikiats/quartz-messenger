@@ -1,19 +1,28 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"quaztz/internal/gateway/config"
 	"quaztz/internal/gateway/connection"
-	privatehttp "quaztz/internal/gateway/transport/http"
+	"quaztz/internal/gateway/service"
+	natstransport "quaztz/internal/gateway/transport/nats"
 	"quaztz/internal/gateway/transport/ws"
 	loader "quaztz/internal/platform/config"
+	"quaztz/internal/platform/token"
 
 	"github.com/nats-io/nats.go"
+	"github.com/redis/go-redis/v9"
 )
+
+const shutdownTimeout = 10 * time.Second
 
 func main() {
 	if err := run(); err != nil {
@@ -28,51 +37,72 @@ func run() error {
 		return err
 	}
 
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
 	// соединение с NATS pub/sub системой
 	nc, err := nats.Connect(
 		cfg.NATSUrl,
 		nats.Name("gateway"),
 		nats.MaxReconnects(-1),
-		nats.ReconnectWait(time.Second*5),
-		nats.DisconnectErrHandler(func(_ *nats.Conn, err error) { log.Warn("nats disconnected", "err", err) }),
-		nats.ReconnectHandler(func(_ *nats.Conn) { log.Info("nats reconnected") }),
+		nats.ReconnectWait(5*time.Second),
+		nats.DisconnectErrHandler(func(_ *nats.Conn, err error) { slog.Warn("nats disconnected", "error", err) }),
+		nats.ReconnectHandler(func(_ *nats.Conn) { slog.Info("nats reconnected") }),
 	)
 	if err != nil {
 		return err
 	}
 	defer nc.Drain()
 
+	// соединение с Redis
+	rdb := redis.NewClient(&redis.Options{Addr: cfg.RedisAddress})
+	defer rdb.Close()
+	if err := rdb.Ping(ctx).Err(); err != nil {
+		return err
+	}
+
 	// in-memory регистр открытых соединений
-	registry := connection.NewRegistry(cfg.AccessTTL)
+	registry := connection.NewRegistry()
 
-	messengerClient := NewClient()
+	// сервисы шлюза
+	auth := service.NewAuth(rdb, token.NewVerifier(cfg.JWTSecret))
+	messenger := service.NewMessenger(nc)
 
-	errs := make(chan error, 2)
+	// прием событий мессенджера
+	subscriber := natstransport.NewSubscriber(nc, registry)
+	if err := subscriber.Start(); err != nil {
+		return err
+	}
 
 	// запуск WebSocket сервера
 	public := http.NewServeMux()
-	public.Handle("GET /ws", ws.NewHandler(registry, cfg.OriginPatterns))
+	public.Handle("GET /ws", ws.NewHandler(auth, messenger, registry, cfg.OriginPatterns))
 	wsServer := &http.Server{
 		Addr:              cfg.WSAddress,
 		Handler:           public,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
+
+	errs := make(chan error, 1)
 	go func() {
 		errs <- wsServer.ListenAndServe()
 	}()
 
-	// запуск сервера приватного API
-	private := privatehttp.NewHandler(registry, cfg.InternalToken)
-	privateApiServer := &http.Server{
-		Addr:              cfg.PrivateAddr,
-		Handler:           private,
-		ReadHeaderTimeout: 5 * time.Second,
+	slog.Info("gateway started", "ws", cfg.WSAddress)
+
+	select {
+	case err := <-errs:
+		return err
+	case <-ctx.Done():
 	}
-	go func() {
-		errs <- privateApiServer.ListenAndServe()
-	}()
 
-	slog.Info("gateway started", "ws", cfg.WSAddress, "private", cfg.PrivateAddr)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+	defer cancel()
 
-	return <-errs
+	if err := wsServer.Shutdown(shutdownCtx); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		return err
+	}
+
+	slog.Info("gateway stopped gracefully")
+	return nil
 }

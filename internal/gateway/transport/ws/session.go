@@ -10,7 +10,7 @@ import (
 	"github.com/google/uuid"
 
 	"quaztz/internal/gateway/connection"
-	"quaztz/internal/gateway/messenger"
+	"quaztz/internal/gateway/service"
 )
 
 const (
@@ -24,7 +24,8 @@ const (
 // объект для управления жизненным циклом соединения пользователя со шлюзом
 type clientSession struct {
 	wsConn    *websocket.Conn
-	messenger *messenger.Client
+	auth      *service.Auth
+	messenger *service.Messenger
 	registry  *connection.Registry
 
 	userID    uuid.UUID
@@ -47,7 +48,7 @@ func (s *clientSession) isAuthorized() bool {
 	return s.userID != uuid.Nil
 }
 
-func (s *clientSession) hasSession(sess messenger.Session) bool {
+func (s *clientSession) hasSession(sess service.Session) bool {
 	return sess.UserID == s.userID && sess.SessionID == s.sessionID
 }
 
@@ -90,7 +91,7 @@ func (s *clientSession) send(ctx context.Context, responseStruct any) error {
 	return s.wsConn.Write(ctx, websocket.MessageText, data)
 }
 
-// функции для вызова через private HTTP API
+// функции для вызова при получении событий из NATS
 func (s *clientSession) Deliver(message connection.Message) {
 	payload := newReceiveMessage(message)
 	_ = s.send(context.Background(), payload)
@@ -166,11 +167,11 @@ func (s *clientSession) handlePing(ctx context.Context, _ pingRequest) error {
 func (s *clientSession) handleAuthorize(ctx context.Context, req authorizeRequest) error {
 	resp := newAuthorizeResponse(false)
 
-	session, err := s.messenger.ValidateSession(ctx, req.Token)
+	session, err := s.auth.ValidateSession(ctx, req.Token)
 
 	if err != nil {
 		switch {
-		case errors.Is(err, messenger.ErrSessionIncorrect):
+		case errors.Is(err, service.ErrSessionIncorrect):
 			resp.Error = &errorStruct{
 				Message: "invalid session token",
 				Code:    codeSessionInvalid,
@@ -194,14 +195,9 @@ func (s *clientSession) handleAuthorize(ctx context.Context, req authorizeReques
 	s.userID = session.UserID
 	s.sessionID = session.SessionID
 
-	if !s.registry.Add(s) {
-		resp.Error = &errorStruct{
-			Message: "session was revoked",
-			Code:    codeSessionInvalid,
-		}
-		defer s.Close("auth error")
-		return s.send(ctx, resp)
-	}
+	// TODO: после Add повторно проверить "revoked:{sessionId}" в Redis,
+	// иначе событие отзыва, пришедшее между ValidateSession и Add, будет пропущено
+	s.registry.Add(s)
 
 	s.setupSessionExpiry(session.ExpiresAt)
 
@@ -212,12 +208,12 @@ func (s *clientSession) handleAuthorize(ctx context.Context, req authorizeReques
 func (s *clientSession) handleSendMessage(ctx context.Context, req sendMessageRequest) error {
 	resp := newSendMessageResponse(req.ClientMessageID)
 
-	sent, err := s.messenger.SendMessage(ctx, messenger.Message{
+	sent, err := s.messenger.SendMessage(ctx, service.Message{
 		ChatID:          req.ChatID,
 		SenderID:        s.userID,
 		SessionID:       s.sessionID,
 		ClientMessageID: req.ClientMessageID,
-		Content: messenger.MessageContent{
+		Content: service.MessageContent{
 			Text: req.Content.Text,
 		},
 	})
@@ -226,7 +222,7 @@ func (s *clientSession) handleSendMessage(ctx context.Context, req sendMessageRe
 		resp.Success = false
 
 		switch {
-		case errors.Is(err, messenger.ErrSendFailed):
+		case errors.Is(err, service.ErrSendFailed):
 			resp.Error = &errorStruct{
 				Code:    codeSendFailed,
 				Message: "failed to send message",

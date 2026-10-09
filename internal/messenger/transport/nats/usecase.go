@@ -1,4 +1,4 @@
-package private
+package nats
 
 import (
 	"context"
@@ -7,10 +7,6 @@ import (
 
 	"quaztz/internal/messenger/domain"
 )
-
-type Authenticator interface {
-	Authenticate(ctx context.Context, accessToken string) (domain.Session, error)
-}
 
 type Sessions interface {
 	CheckRevoked(ctx context.Context, sessionID uuid.UUID) error

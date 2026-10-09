@@ -41,6 +41,5 @@
 | Спецификация | Назначение |
 |---|---|
 | [Публичное API сервиса мессенджера](./api/messenger/public.openapi.yaml) | OpenAPI, запросы клиента |
-| [Внутреннее API сервиса мессенджера](./api/messenger/private.openapi.yaml) | OpenAPI, запросы шлюза |
-| [Внутреннее API шлюза соединений](./api/gateway/private.openapi.yaml) | OpenAPI, запросы сервиса мессенджера |
+| [Внутреннее API шлюза и мессенджера](./internal/api/bus) | Go DTO и subject'ы NATS: запросы шлюза и события мессенджера |
 | [WebSocket API шлюза соединений](./api/gateway/websocket.asyncapi.yaml) | AsyncAPI, обмен клиента со шлюзом |

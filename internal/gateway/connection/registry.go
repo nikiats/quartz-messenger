@@ -27,33 +27,24 @@ type Conn interface {
 type connSet map[Conn]struct{}
 
 type Registry struct {
-	mu         sync.RWMutex
-	byUser     map[uuid.UUID]connSet
-	bySession  map[uuid.UUID]connSet
-	revoked    map[uuid.UUID]time.Time
-	sessionTTL time.Duration
+	mu        sync.RWMutex
+	byUser    map[uuid.UUID]connSet
+	bySession map[uuid.UUID]connSet
 }
 
-func NewRegistry(sessionTTL time.Duration) *Registry {
+func NewRegistry() *Registry {
 	return &Registry{
-		byUser:     map[uuid.UUID]connSet{},
-		bySession:  map[uuid.UUID]connSet{},
-		revoked:    map[uuid.UUID]time.Time{},
-		sessionTTL: sessionTTL,
+		byUser:    map[uuid.UUID]connSet{},
+		bySession: map[uuid.UUID]connSet{},
 	}
 }
 
-func (r *Registry) Add(conn Conn) bool {
+func (r *Registry) Add(conn Conn) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if _, ok := r.revoked[conn.SessionID()]; ok {
-		return false
-	}
-
 	add(r.byUser, conn.UserID(), conn)
 	add(r.bySession, conn.SessionID(), conn)
-	return true
 }
 
 func (r *Registry) Remove(conn Conn) {
@@ -72,14 +63,6 @@ func (r *Registry) Deliver(userID uuid.UUID, msg Message) {
 
 func (r *Registry) CloseSession(sessionID uuid.UUID) {
 	r.mu.Lock()
-
-	// очистка истекших сессий из списка отозванных
-	for id, expiry := range r.revoked {
-		if expiry.Before(time.Now()) {
-			delete(r.revoked, id)
-		}
-	}
-	r.revoked[sessionID] = time.Now().Add(r.sessionTTL)
 
 	// удаление соединений из регистра соединений
 	conns := slices.Collect(maps.Keys(r.bySession[sessionID]))

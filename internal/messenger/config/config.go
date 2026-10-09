@@ -3,16 +3,13 @@ package config
 import "time"
 
 type Config struct {
-	PublicAddr          string        `env:"PUBLIC_HTTP_ADDR,notEmpty"`
-	PrivateAddr         string        `env:"PRIVATE_HTTP_ADDR,notEmpty"`
-	PostgresURL         string        `env:"POSTGRES_URL,notEmpty"`
-	JWTSecret           string        `env:"JWT_SECRET,notEmpty"`
-	AccessTTL           time.Duration `env:"ACCESS_TTL,notEmpty"`
-	RefreshTTL          time.Duration `env:"REFRESH_TTL,notEmpty"`
-	InternalToken       string        `env:"INTERNAL_TOKEN,notEmpty"`
-	GatewayURL          string        `env:"GATEWAY_URL,notEmpty"`
-	MaxGatewayIdleConns int           `env:"GATEWAY_MAX_IDLE_CONNS,notEmpty"`
-	Argon2              Argon2        `envPrefix:"ARGON2_"`
+	PublicAddr  string        `env:"PUBLIC_HTTP_ADDR,notEmpty"`
+	PostgresURL string        `env:"POSTGRES_URL,notEmpty"`
+	JWTSecret   string        `env:"JWT_SECRET,notEmpty"`
+	AccessTTL   time.Duration `env:"ACCESS_TTL,notEmpty"`
+	RefreshTTL  time.Duration `env:"REFRESH_TTL,notEmpty"`
+	NATSUrl     string        `env:"NATS_URL,notEmpty"`
+	Argon2      Argon2        `envPrefix:"ARGON2_"`
 }
 
 type Argon2 struct {

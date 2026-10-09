@@ -10,12 +10,14 @@ import (
 	"quaztz/internal/messenger/config"
 	"quaztz/internal/messenger/gateway"
 	"quaztz/internal/messenger/repository/postgres"
-	"quaztz/internal/messenger/transport/http/private"
 	"quaztz/internal/messenger/transport/http/public"
+	natstransport "quaztz/internal/messenger/transport/nats"
 	"quaztz/internal/messenger/usecase"
 	loader "quaztz/internal/platform/config"
+	"quaztz/internal/platform/token"
 
 	"github.com/alexedwards/argon2id"
+	"github.com/nats-io/nats.go"
 )
 
 func main() {
@@ -45,11 +47,22 @@ func run() error {
 		return err
 	}
 
-	// клиент к gateway service
-	gatewayClient, err := gateway.NewClient(cfg.GatewayURL, cfg.InternalToken, cfg.MaxGatewayIdleConns)
+	// соединение с NATS pub/sub системой
+	nc, err := nats.Connect(
+		cfg.NATSUrl,
+		nats.Name("messenger"),
+		nats.MaxReconnects(-1),
+		nats.ReconnectWait(5*time.Second),
+		nats.DisconnectErrHandler(func(_ *nats.Conn, err error) { slog.Warn("nats disconnected", "error", err) }),
+		nats.ReconnectHandler(func(_ *nats.Conn) { slog.Info("nats reconnected") }),
+	)
 	if err != nil {
 		return err
 	}
+	defer nc.Drain()
+
+	// клиент к gateway service
+	gatewayClient := gateway.NewClient(nc)
 
 	// создание сущностей слоя repository
 	messengerRepository := postgres.NewMessenger(pool)
@@ -61,7 +74,8 @@ func run() error {
 		sessionRepository,
 		userRepository,
 		gatewayClient,
-		cfg.JWTSecret,
+		token.NewIssuer(cfg.JWTSecret),
+		token.NewVerifier(cfg.JWTSecret),
 		cfg.AccessTTL,
 		cfg.RefreshTTL,
 	)
@@ -77,7 +91,7 @@ func run() error {
 	chats := usecase.NewChats(messengerRepository)
 	messages := usecase.NewMessages(messengerRepository, gatewayClient)
 
-	errs := make(chan error, 2)
+	errs := make(chan error, 1)
 
 	// запуск публичного API
 	publicApiServer := &http.Server{
@@ -89,17 +103,12 @@ func run() error {
 		errs <- publicApiServer.ListenAndServe()
 	}()
 
-	// запуск внутреннего API
-	privateApiServer := &http.Server{
-		Addr:              cfg.PrivateAddr,
-		Handler:           private.NewHandler(cfg.InternalToken, messages, sessions, sessions),
-		ReadHeaderTimeout: 5 * time.Second,
+	// прием запросов шлюзов
+	if err := natstransport.NewServer(nc, messages, sessions).Start(); err != nil {
+		return err
 	}
-	go func() {
-		errs <- privateApiServer.ListenAndServe()
-	}()
 
-	slog.Info("messenger started", "public", cfg.PublicAddr, "private", cfg.PrivateAddr)
+	slog.Info("messenger started", "public", cfg.PublicAddr)
 
 	return <-errs
 }
