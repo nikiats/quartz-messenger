@@ -10,7 +10,7 @@ import (
 	"quaztz/internal/messenger/config"
 	"quaztz/internal/messenger/gateway"
 	"quaztz/internal/messenger/repository/postgres"
-	"quaztz/internal/messenger/transport/http/public"
+	public "quaztz/internal/messenger/transport/http"
 	natstransport "quaztz/internal/messenger/transport/nats"
 	"quaztz/internal/messenger/usecase"
 	loader "quaztz/internal/platform/config"
