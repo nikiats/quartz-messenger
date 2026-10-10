@@ -48,3 +48,8 @@ type SessionRepository interface {
 	) error
 	RevokeSession(ctx context.Context, userID, sessionID uuid.UUID) error
 }
+
+type IdempotencyRepository interface {
+	MessageID(ctx context.Context, chatID int64, senderID, clientMessageID uuid.UUID, messageID int64) (int64, error)
+	ChatID(ctx context.Context, userID, clientRequestID uuid.UUID, chatID int64) (int64, error)
+}

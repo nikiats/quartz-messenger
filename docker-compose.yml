@@ -194,6 +194,7 @@ services:
       CASSANDRA_HOSTS: cassandra:9042
       CASSANDRA_KEYSPACE: quaztz
       REDIS_ADDR: redis:6379
+      IDEMPOTENCY_TTL: 24h
       NATS_URL: nats://nats:4222
       OPENSEARCH_URL: http://opensearch:9200
       JWT_SECRET: change-me

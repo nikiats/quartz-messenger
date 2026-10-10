@@ -8,16 +8,23 @@ import (
 )
 
 type Chats struct {
-	r     MessengerRepository
-	users UserRepository
-	ids   IDGenerator
+	r           MessengerRepository
+	users       UserRepository
+	idempotency IdempotencyRepository
+	ids         IDGenerator
 }
 
-func NewChats(r MessengerRepository, users UserRepository, ids IDGenerator) *Chats {
+func NewChats(
+	r MessengerRepository,
+	users UserRepository,
+	idempotency IdempotencyRepository,
+	ids IDGenerator,
+) *Chats {
 	return &Chats{
-		r:     r,
-		users: users,
-		ids:   ids,
+		r:           r,
+		users:       users,
+		idempotency: idempotency,
+		ids:         ids,
 	}
 }
 

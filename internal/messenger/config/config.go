@@ -3,15 +3,16 @@ package config
 import "time"
 
 type Config struct {
-	PublicAddr  string        `env:"PUBLIC_HTTP_ADDR,notEmpty"`
-	PostgresURL string        `env:"POSTGRES_URL,notEmpty"`
-	Cassandra   Cassandra     `envPrefix:"CASSANDRA_"`
-	JWTSecret   string        `env:"JWT_SECRET,notEmpty"`
-	AccessTTL   time.Duration `env:"ACCESS_TTL,notEmpty"`
-	RefreshTTL  time.Duration `env:"REFRESH_TTL,notEmpty"`
-	NATSUrl     string        `env:"NATS_URL,notEmpty"`
-	RedisAddr   string        `env:"REDIS_ADDR,notEmpty"`
-	Argon2      Argon2        `envPrefix:"ARGON2_"`
+	PublicAddr     string        `env:"PUBLIC_HTTP_ADDR,notEmpty"`
+	PostgresURL    string        `env:"POSTGRES_URL,notEmpty"`
+	Cassandra      Cassandra     `envPrefix:"CASSANDRA_"`
+	JWTSecret      string        `env:"JWT_SECRET,notEmpty"`
+	AccessTTL      time.Duration `env:"ACCESS_TTL,notEmpty"`
+	RefreshTTL     time.Duration `env:"REFRESH_TTL,notEmpty"`
+	NATSUrl        string        `env:"NATS_URL,notEmpty"`
+	RedisAddr      string        `env:"REDIS_ADDR,notEmpty"`
+	IdempotencyTTL time.Duration `env:"IDEMPOTENCY_TTL,notEmpty"`
+	Argon2         Argon2        `envPrefix:"ARGON2_"`
 }
 
 type Cassandra struct {

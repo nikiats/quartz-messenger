@@ -11,6 +11,7 @@ import (
 	"quaztz/internal/messenger/gateway"
 	"quaztz/internal/messenger/repository/cassandra"
 	"quaztz/internal/messenger/repository/postgres"
+	redisrepository "quaztz/internal/messenger/repository/redis"
 	public "quaztz/internal/messenger/transport/http"
 	natstransport "quaztz/internal/messenger/transport/nats"
 	"quaztz/internal/messenger/usecase"
@@ -92,6 +93,7 @@ func run() error {
 	messengerRepository := cassandra.NewMessenger(session)
 	userRepository := postgres.NewUsers(pool)
 	sessionRepository := postgres.NewSessions(pool)
+	idempotencyRepository := redisrepository.NewIdempotency(rdb, cfg.IdempotencyTTL)
 
 	// usecase: управление сессиями
 	sessions := usecase.NewSessions(
@@ -106,8 +108,8 @@ func run() error {
 	// usecase: работа с пользователями, чатами, сообщениями
 	passwordParams := argon2id.Params(cfg.Argon2)
 	users := usecase.NewUsers(userRepository, &passwordParams)
-	chats := usecase.NewChats(messengerRepository, userRepository, ids)
-	messages := usecase.NewMessages(messengerRepository, gatewayClient, ids)
+	chats := usecase.NewChats(messengerRepository, userRepository, idempotencyRepository, ids)
+	messages := usecase.NewMessages(messengerRepository, gatewayClient, idempotencyRepository, ids)
 
 	errs := make(chan error, 1)
 
