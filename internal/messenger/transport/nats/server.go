@@ -12,15 +12,19 @@ import (
 	"quaztz/internal/messenger/domain"
 )
 
+// одновременно обрабатываемых запросов на отправку
+const maxConcurrentSends = 1024
+
 // обработка запросов шлюзов через NATS request-reply
 type Server struct {
-	nc *nats.Conn
-	m  Messages
-	s  Sessions
+	nc    *nats.Conn
+	m     Messages
+	s     Sessions
+	sends chan struct{}
 }
 
 func NewServer(nc *nats.Conn, m Messages, s Sessions) *Server {
-	return &Server{nc: nc, m: m, s: s}
+	return &Server{nc: nc, m: m, s: s, sends: make(chan struct{}, maxConcurrentSends)}
 }
 
 // регистрация сервиса в queue group мессенджеров
@@ -41,7 +45,16 @@ func (s *Server) Start() error {
 	)
 }
 
+// NATS вызывает обработчик последовательно, поэтому каждый запрос уходит в свою горутину
 func (s *Server) handleSendMessage(r micro.Request) {
+	s.sends <- struct{}{}
+	go func() {
+		defer func() { <-s.sends }()
+		s.respondSendMessage(r)
+	}()
+}
+
+func (s *Server) respondSendMessage(r micro.Request) {
 	var req bus.SendMessageRequest
 	if err := json.Unmarshal(r.Data(), &req); err != nil {
 		_ = r.Error(bus.CodeInvalidRequest, "invalid request", nil)
