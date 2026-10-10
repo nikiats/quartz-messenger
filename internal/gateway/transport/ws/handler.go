@@ -44,11 +44,12 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	conn.SetReadLimit(readLimit)
 
 	connSession := &clientSession{
-		wsConn:    conn,
-		auth:      h.auth,
-		messenger: h.messenger,
-		presence:  h.presence,
-		registry:  h.registry,
+		wsConn:     conn,
+		auth:       h.auth,
+		messenger:  h.messenger,
+		presence:   h.presence,
+		registry:   h.registry,
+		deliveries: make(chan connection.Message, deliveryQueue),
 	}
 
 	connSession.run(r.Context())

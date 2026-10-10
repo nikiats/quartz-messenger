@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"sync/atomic"
 	"time"
 
 	"github.com/coder/websocket"
@@ -19,6 +20,7 @@ const (
 	writeTimeout    = 5 * time.Second
 	readLimit       = 16 << 10
 	maxContentRunes = 1000
+	deliveryQueue   = 256
 )
 
 // объект для управления жизненным циклом соединения пользователя со шлюзом
@@ -34,6 +36,10 @@ type clientSession struct {
 
 	askReauthTimer *time.Timer
 	expireTimer    *time.Timer
+
+	// сообщения для доставки пишутся в сокет отдельной горутиной
+	deliveries chan connection.Message
+	overflowed atomic.Bool
 }
 
 // getters и helpers
@@ -93,9 +99,28 @@ func (s *clientSession) send(ctx context.Context, responseStruct any) error {
 }
 
 // функции для вызова при получении событий из NATS
+// не блокирует: клиент, не успевающий читать, отключается и после переподключения догружает пропущенное
 func (s *clientSession) Deliver(message connection.Message) {
-	payload := newReceiveMessage(message)
-	_ = s.send(context.Background(), payload)
+	select {
+	case s.deliveries <- message:
+	default:
+		if !s.overflowed.Swap(true) {
+			go s.Close("delivery queue overflow")
+		}
+	}
+}
+
+func (s *clientSession) writeDeliveries(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case message := <-s.deliveries:
+			if err := s.send(ctx, newReceiveMessage(message)); err != nil {
+				return
+			}
+		}
+	}
 }
 
 func (s *clientSession) Close(reason string) {
@@ -113,6 +138,10 @@ func (s *clientSession) unregister() {
 func (s *clientSession) run(ctx context.Context) {
 	defer s.unregister()
 	defer s.stopTimers()
+
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	go s.writeDeliveries(ctx)
 
 	idleTimer := time.AfterFunc(idleTimeout, func() {
 		s.Close("idle time exceeded")
