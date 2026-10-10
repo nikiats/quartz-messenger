@@ -37,7 +37,31 @@ func (m *Messages) History(
 	chatID int64,
 	query domain.MessageQuery,
 ) ([]domain.Message, bool, error) {
-	panic("TODO: операции 12, 13")
+	// проверка наличия и неудаленности чата
+	if _, err := activeChat(ctx, m.r, chatID, userID); err != nil {
+		return nil, false, err
+	}
+
+	// TODO: поиск через OpenSearch
+	if query.Search != "" {
+		return nil, false, nil
+	}
+
+	// запрашиваем на одно сообщение больше, чтобы узнать, есть ли еще
+	limit := query.Limit
+	query.Limit = limit + 1
+
+	messages, err := m.r.GetMessages(ctx, chatID, query)
+	if err != nil {
+		return nil, false, err
+	}
+
+	hasMore := len(messages) > limit
+	if hasMore {
+		messages = messages[:limit]
+	}
+
+	return messages, hasMore, nil
 }
 
 func (m *Messages) Send(
@@ -48,12 +72,8 @@ func (m *Messages) Send(
 	content domain.MessageContent,
 ) (domain.Message, error) {
 	// проверка наличия и неудаленности чата
-	chat, err := m.r.GetChat(ctx, chatID, senderID)
-	if err != nil {
+	if _, err := activeChat(ctx, m.r, chatID, senderID); err != nil {
 		return domain.Message{}, err
-	}
-	if chat.Deleted {
-		return domain.Message{}, domain.ErrChatNotFound
 	}
 
 	// создаем новый ID, но меняем его на старый, если это повторная отправка

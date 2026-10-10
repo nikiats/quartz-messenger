@@ -62,3 +62,15 @@ func (c *Chats) AddMember(ctx context.Context, userID uuid.UUID, chatID int64, m
 func (c *Chats) RemoveMember(ctx context.Context, userID uuid.UUID, chatID int64, memberID uuid.UUID) error {
 	panic("TODO: операции 6, 7")
 }
+
+// чат, в котором пользователь участник и который не удален
+func activeChat(ctx context.Context, r MessengerRepository, chatID int64, userID uuid.UUID) (domain.Chat, error) {
+	chat, err := r.GetChat(ctx, chatID, userID)
+	if err != nil {
+		return domain.Chat{}, err
+	}
+	if chat.Deleted {
+		return domain.Chat{}, domain.ErrChatNotFound
+	}
+	return chat, nil
+}
