@@ -10,12 +10,14 @@ import (
 type Messages struct {
 	r       MessengerRepository
 	gateway Gateway
+	ids     IDGenerator
 }
 
-func NewMessages(r MessengerRepository, gateway Gateway) *Messages {
+func NewMessages(r MessengerRepository, gateway Gateway, ids IDGenerator) *Messages {
 	return &Messages{
 		r:       r,
 		gateway: gateway,
+		ids:     ids,
 	}
 }
 

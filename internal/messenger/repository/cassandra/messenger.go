@@ -2,9 +2,9 @@ package cassandra
 
 import (
 	"quaztz/internal/messenger/domain"
+	"quaztz/internal/platform/snowflake"
 	"time"
 
-	"github.com/bwmarrin/snowflake"
 	"github.com/scylladb/gocqlx/v3"
 )
 
@@ -42,10 +42,6 @@ func checkVersion(applied bool, err error) error {
 	return nil
 }
 
-func idTime(id int64) time.Time {
-	return time.UnixMilli(snowflake.ParseInt64(id).Time())
-}
-
 func bucket(messageID int64) int32 {
-	return int32(idTime(messageID).UnixMilli() / bucketSize.Milliseconds())
+	return int32(snowflake.Time(messageID).UnixMilli() / bucketSize.Milliseconds())
 }

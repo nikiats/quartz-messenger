@@ -5,6 +5,7 @@ import (
 	"errors"
 	"quaztz/internal/messenger/domain"
 	"quaztz/internal/messenger/repository/cassandra/db"
+	"quaztz/internal/platform/snowflake"
 
 	"github.com/gocql/gocql"
 	"github.com/scylladb/gocqlx/v3/qb"
@@ -98,7 +99,7 @@ func (r *Messenger) UpdateChatActivity(ctx context.Context, message domain.Messa
 		LastMessageId:       message.ID,
 		LastMessageSenderId: message.SenderID,
 		LastMessagePreview:  preview(message.Content.Text),
-	}).WithTimestamp(idTime(message.ID).UnixMicro()).ExecRelease()
+	}).WithTimestamp(snowflake.Time(message.ID).UnixMicro()).ExecRelease()
 }
 
 func toMessage(row db.MessagesStruct) domain.Message {
@@ -106,7 +107,7 @@ func toMessage(row db.MessagesStruct) domain.Message {
 		ID:       row.MessageId,
 		ChatID:   row.ChatId,
 		SenderID: row.SenderId,
-		SentAt:   idTime(row.MessageId),
+		SentAt:   snowflake.Time(row.MessageId),
 		Content:  domain.MessageContent{Text: row.Content},
 	}
 }

@@ -10,12 +10,14 @@ import (
 type Chats struct {
 	r     MessengerRepository
 	users UserRepository
+	ids   IDGenerator
 }
 
-func NewChats(r MessengerRepository, users UserRepository) *Chats {
+func NewChats(r MessengerRepository, users UserRepository, ids IDGenerator) *Chats {
 	return &Chats{
 		r:     r,
 		users: users,
+		ids:   ids,
 	}
 }
 

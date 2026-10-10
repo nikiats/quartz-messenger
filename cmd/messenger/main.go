@@ -15,6 +15,7 @@ import (
 	natstransport "quaztz/internal/messenger/transport/nats"
 	"quaztz/internal/messenger/usecase"
 	loader "quaztz/internal/platform/config"
+	"quaztz/internal/platform/snowflake"
 	"quaztz/internal/platform/token"
 
 	"github.com/alexedwards/argon2id"
@@ -77,6 +78,13 @@ func run() error {
 		return err
 	}
 
+	// генератор Snowflake ID, номер узла арендуется в Redis
+	ids, err := snowflake.New(ctx, rdb)
+	if err != nil {
+		return err
+	}
+	defer ids.Close()
+
 	// клиент к gateway service
 	gatewayClient := gateway.NewClient(nc, rdb, cfg.AccessTTL)
 
@@ -98,8 +106,8 @@ func run() error {
 	// usecase: работа с пользователями, чатами, сообщениями
 	passwordParams := argon2id.Params(cfg.Argon2)
 	users := usecase.NewUsers(userRepository, &passwordParams)
-	chats := usecase.NewChats(messengerRepository, userRepository)
-	messages := usecase.NewMessages(messengerRepository, gatewayClient)
+	chats := usecase.NewChats(messengerRepository, userRepository, ids)
+	messages := usecase.NewMessages(messengerRepository, gatewayClient, ids)
 
 	errs := make(chan error, 1)
 
@@ -120,5 +128,10 @@ func run() error {
 
 	slog.Info("messenger started", "public", cfg.PublicAddr)
 
-	return <-errs
+	select {
+	case err := <-errs:
+		return err
+	case err := <-ids.Err():
+		return err
+	}
 }
