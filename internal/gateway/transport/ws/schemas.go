@@ -58,7 +58,7 @@ type messageContent struct {
 
 type sendMessageRequest struct {
 	base
-	ChatID          uuid.UUID      `json:"chatId"`
+	ChatID          int64          `json:"chatId,string"`
 	ClientMessageID uuid.UUID      `json:"clientMessageId"`
 	Content         messageContent `json:"content"`
 }
@@ -90,7 +90,7 @@ type sendMessageResponse struct {
 	ClientMessageID uuid.UUID    `json:"clientMessageId"`
 	Success         bool         `json:"success"`
 	Error           *errorStruct `json:"error,omitempty"`
-	Seqnum          int64        `json:"seqnum,omitzero"`
+	MessageID       int64        `json:"messageId,string,omitzero"`
 	SentAt          time.Time    `json:"sentAt,omitzero"`
 }
 
@@ -101,11 +101,11 @@ type pongResponse struct {
 // схемы отправляемых сообщений-событий
 type receiveMessage struct {
 	base
-	ChatID   uuid.UUID      `json:"chatId"`
-	SenderID uuid.UUID      `json:"senderId"`
-	Seqnum   int64          `json:"seqnum"`
-	SentAt   time.Time      `json:"sentAt"`
-	Content  messageContent `json:"content"`
+	ChatID    int64          `json:"chatId,string"`
+	MessageID int64          `json:"messageId,string"`
+	SenderID  uuid.UUID      `json:"senderId"`
+	SentAt    time.Time      `json:"sentAt"`
+	Content   messageContent `json:"content"`
 }
 
 type requireAuthorize struct {
@@ -143,11 +143,11 @@ func newSendMessageResponse(clientMessageID uuid.UUID) sendMessageResponse {
 
 func newReceiveMessage(msg connection.Message) receiveMessage {
 	return receiveMessage{
-		base:     base{methodReceiveMessage},
-		ChatID:   msg.ChatID,
-		SenderID: msg.SenderID,
-		Seqnum:   msg.Seqnum,
-		SentAt:   msg.SentAt,
+		base:      base{methodReceiveMessage},
+		ChatID:    msg.ChatID,
+		MessageID: msg.ID,
+		SenderID:  msg.SenderID,
+		SentAt:    msg.SentAt,
 		Content: messageContent{
 			Text: msg.Content,
 		},
@@ -160,7 +160,7 @@ func validateSendMessageRequest(req sendMessageRequest) error {
 		return errors.New("clientMessageId is required")
 	}
 
-	if req.ChatID == uuid.Nil {
+	if req.ChatID == 0 {
 		return errors.New("chatId is required")
 	}
 

@@ -1,3 +1,7 @@
+-- name: CreateLogin :exec
+INSERT INTO user_logins (login, user_id)
+VALUES (@login, @user_id);
+
 -- name: CreateUser :exec
 INSERT INTO users (id, login, password_hash)
 VALUES (@id, @login, @password_hash);
@@ -10,7 +14,7 @@ SELECT id, username, visible_name
 -- name: GetCredentials :one
 SELECT id, password_hash, suspended
   FROM users
- WHERE login = $1;
+ WHERE id = (SELECT l.user_id FROM user_logins l WHERE l.login = $1);
 
 -- name: SearchUsers :many
 SELECT id, username, visible_name
@@ -19,6 +23,20 @@ SELECT id, username, visible_name
    AND NOT suspended
  ORDER BY username
  LIMIT @row_limit;
+
+-- name: LockUsername :one
+SELECT username
+  FROM users
+ WHERE id = $1
+   FOR UPDATE;
+
+-- name: CreateUsername :exec
+INSERT INTO usernames (username, user_id)
+VALUES (@username, @user_id);
+
+-- name: DeleteUsername :exec
+DELETE FROM usernames
+ WHERE username = $1;
 
 -- name: UpdateProfile :exec
 UPDATE users

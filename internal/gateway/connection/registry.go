@@ -10,9 +10,9 @@ import (
 )
 
 type Message struct {
-	ChatID   uuid.UUID
+	ChatID   int64
 	SenderID uuid.UUID
-	Seqnum   int64
+	ID       int64
 	Content  string
 	SentAt   time.Time
 }

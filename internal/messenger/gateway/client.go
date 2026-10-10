@@ -58,8 +58,8 @@ func (c *Client) DeliverMessage(ctx context.Context, recipientIDs []uuid.UUID, m
 
 		data, err := json.Marshal(bus.MessageEvent{
 			ChatID:       message.ChatID,
+			MessageID:    message.ID,
 			SenderID:     message.SenderID,
-			Seqnum:       message.Seqnum,
 			Content:      bus.MessageContent(message.Content),
 			SentAt:       message.SentAt,
 			RecipientIDs: userIDs,

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"quaztz/internal/messenger/domain"
 	"quaztz/internal/messenger/repository/postgres/db"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -12,8 +13,8 @@ import (
 )
 
 const (
-	loginUniqueConstraint    = "users_login_key"
-	usernameUniqueConstraint = "users_username_key"
+	loginUniqueConstraint    = "user_logins_pkey"
+	usernameUniqueConstraint = "usernames_pkey"
 )
 
 type Users struct {
@@ -29,15 +30,24 @@ func NewUsers(pool *pgxpool.Pool) *Users {
 }
 
 func (r *Users) CreateUser(ctx context.Context, userID uuid.UUID, login, passwordHash string) error {
-	err := r.q.CreateUser(ctx, db.CreateUserParams{
-		ID:           userID,
-		Login:        login,
-		PasswordHash: passwordHash,
+	return inTx(ctx, r.pool, r.q, func(q *db.Queries) error {
+		err := q.CreateLogin(ctx, db.CreateLoginParams{
+			Login:  login,
+			UserID: userID,
+		})
+		if isUniqueViolation(err, loginUniqueConstraint) {
+			return domain.ErrLoginTaken
+		}
+		if err != nil {
+			return err
+		}
+
+		return q.CreateUser(ctx, db.CreateUserParams{
+			ID:           userID,
+			Login:        login,
+			PasswordHash: passwordHash,
+		})
 	})
-	if isUniqueViolation(err, loginUniqueConstraint) {
-		return domain.ErrLoginTaken
-	}
-	return err
 }
 
 func (r *Users) GetUser(ctx context.Context, userID uuid.UUID) (domain.User, error) {
@@ -99,13 +109,52 @@ func (r *Users) SearchUsers(ctx context.Context, username string, limit int) ([]
 }
 
 func (r *Users) UpdateProfile(ctx context.Context, userID uuid.UUID, visibleName, username *string) error {
-	err := r.q.UpdateProfile(ctx, db.UpdateProfileParams{
-		ID:          userID,
-		VisibleName: visibleName,
-		Username:    username,
+	return inTx(ctx, r.pool, r.q, func(q *db.Queries) error {
+		if username != nil {
+			if err := changeUsername(ctx, q, userID, *username); err != nil {
+				return err
+			}
+		}
+
+		return q.UpdateProfile(ctx, db.UpdateProfileParams{
+			ID:          userID,
+			VisibleName: visibleName,
+			Username:    username,
+		})
+	})
+}
+
+func (r *Users) IsActiveUser(ctx context.Context, userID uuid.UUID) (bool, error) {
+	return r.q.IsActiveUser(ctx, userID)
+}
+
+func (r *Users) CountActiveUsers(ctx context.Context, userIDs []uuid.UUID) (int, error) {
+	count, err := r.q.CountActiveUsers(ctx, userIDs)
+	return int(count), err
+}
+
+func changeUsername(ctx context.Context, q *db.Queries, userID uuid.UUID, username string) error {
+	oldUsername, err := q.LockUsername(ctx, userID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.ErrUserNotFound
+	}
+	if err != nil {
+		return err
+	}
+	if oldUsername != nil && strings.EqualFold(*oldUsername, username) {
+		return nil
+	}
+
+	err = q.CreateUsername(ctx, db.CreateUsernameParams{
+		Username: username,
+		UserID:   userID,
 	})
 	if isUniqueViolation(err, usernameUniqueConstraint) {
 		return domain.ErrUsernameTaken
 	}
-	return err
+	if err != nil || oldUsername == nil {
+		return err
+	}
+
+	return q.DeleteUsername(ctx, *oldUsername)
 }

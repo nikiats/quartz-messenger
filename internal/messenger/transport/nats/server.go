@@ -70,5 +70,5 @@ func (s *Server) sendMessage(ctx context.Context, req bus.SendMessageRequest) (b
 		return bus.SendMessageResponse{}, err
 	}
 
-	return bus.SendMessageResponse{Seqnum: message.Seqnum, SentAt: message.SentAt}, nil
+	return bus.SendMessageResponse{MessageID: message.ID, SentAt: message.SentAt}, nil
 }

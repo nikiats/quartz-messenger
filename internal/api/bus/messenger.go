@@ -12,7 +12,7 @@ type MessageContent struct {
 
 // SubjectSendMessage
 type SendMessageRequest struct {
-	ChatID          uuid.UUID      `json:"chatId"`
+	ChatID          int64          `json:"chatId,string"`
 	SenderID        uuid.UUID      `json:"senderId"`
 	SessionID       uuid.UUID      `json:"sessionId"`
 	ClientMessageID uuid.UUID      `json:"clientMessageId"`
@@ -20,6 +20,6 @@ type SendMessageRequest struct {
 }
 
 type SendMessageResponse struct {
-	Seqnum int64     `json:"seqnum"`
-	SentAt time.Time `json:"sentAt"`
+	MessageID int64     `json:"messageId,string"`
+	SentAt    time.Time `json:"sentAt"`
 }

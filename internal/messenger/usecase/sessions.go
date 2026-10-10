@@ -95,12 +95,8 @@ func (s *Sessions) Refresh(ctx context.Context, refreshToken string) (domain.Tok
 		return domain.Tokens{}, err
 	}
 
-	_, err = s.r.RefreshSession(
-		ctx,
-		hashToken(refreshToken),
-		hashToken(tokens.RefreshToken),
-		now.Add(s.refreshTTL),
-	)
+	session.ExpiresAt = now.Add(s.refreshTTL)
+	err = s.r.RefreshSession(ctx, session, hashToken(refreshToken), hashToken(tokens.RefreshToken))
 	if err != nil {
 		return domain.Tokens{}, err
 	}

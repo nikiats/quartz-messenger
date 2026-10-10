@@ -25,6 +25,21 @@ func (q *Queries) CountActiveUsers(ctx context.Context, ids []uuid.UUID) (int64,
 	return count, err
 }
 
+const createLogin = `-- name: CreateLogin :exec
+INSERT INTO user_logins (login, user_id)
+VALUES ($1, $2)
+`
+
+type CreateLoginParams struct {
+	Login  string
+	UserID uuid.UUID
+}
+
+func (q *Queries) CreateLogin(ctx context.Context, arg CreateLoginParams) error {
+	_, err := q.db.Exec(ctx, createLogin, arg.Login, arg.UserID)
+	return err
+}
+
 const createUser = `-- name: CreateUser :exec
 INSERT INTO users (id, login, password_hash)
 VALUES ($1, $2, $3)
@@ -41,10 +56,35 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) error {
 	return err
 }
 
+const createUsername = `-- name: CreateUsername :exec
+INSERT INTO usernames (username, user_id)
+VALUES ($1, $2)
+`
+
+type CreateUsernameParams struct {
+	Username string
+	UserID   uuid.UUID
+}
+
+func (q *Queries) CreateUsername(ctx context.Context, arg CreateUsernameParams) error {
+	_, err := q.db.Exec(ctx, createUsername, arg.Username, arg.UserID)
+	return err
+}
+
+const deleteUsername = `-- name: DeleteUsername :exec
+DELETE FROM usernames
+ WHERE username = $1
+`
+
+func (q *Queries) DeleteUsername(ctx context.Context, username string) error {
+	_, err := q.db.Exec(ctx, deleteUsername, username)
+	return err
+}
+
 const getCredentials = `-- name: GetCredentials :one
 SELECT id, password_hash, suspended
   FROM users
- WHERE login = $1
+ WHERE id = (SELECT l.user_id FROM user_logins l WHERE l.login = $1)
 `
 
 type GetCredentialsRow struct {
@@ -90,6 +130,20 @@ func (q *Queries) IsActiveUser(ctx context.Context, id uuid.UUID) (bool, error) 
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
+}
+
+const lockUsername = `-- name: LockUsername :one
+SELECT username
+  FROM users
+ WHERE id = $1
+   FOR UPDATE
+`
+
+func (q *Queries) LockUsername(ctx context.Context, id uuid.UUID) (*string, error) {
+	row := q.db.QueryRow(ctx, lockUsername, id)
+	var username *string
+	err := row.Scan(&username)
+	return username, err
 }
 
 const searchUsers = `-- name: SearchUsers :many

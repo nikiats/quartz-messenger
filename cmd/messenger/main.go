@@ -9,6 +9,7 @@ import (
 
 	"quaztz/internal/messenger/config"
 	"quaztz/internal/messenger/gateway"
+	"quaztz/internal/messenger/repository/cassandra"
 	"quaztz/internal/messenger/repository/postgres"
 	public "quaztz/internal/messenger/transport/http"
 	natstransport "quaztz/internal/messenger/transport/nats"
@@ -48,6 +49,13 @@ func run() error {
 		return err
 	}
 
+	// соединение с Cassandra
+	session, err := cassandra.NewSession(cfg.Cassandra.Hosts, cfg.Cassandra.Keyspace, cfg.Cassandra.DisableHostLookup)
+	if err != nil {
+		return err
+	}
+	defer session.Close()
+
 	// соединение с NATS pub/sub системой
 	nc, err := nats.Connect(
 		cfg.NATSUrl,
@@ -73,7 +81,7 @@ func run() error {
 	gatewayClient := gateway.NewClient(nc, rdb, cfg.AccessTTL)
 
 	// создание сущностей слоя repository
-	messengerRepository := postgres.NewMessenger(pool)
+	messengerRepository := cassandra.NewMessenger(session)
 	userRepository := postgres.NewUsers(pool)
 	sessionRepository := postgres.NewSessions(pool)
 
@@ -90,7 +98,7 @@ func run() error {
 	// usecase: работа с пользователями, чатами, сообщениями
 	passwordParams := argon2id.Params(cfg.Argon2)
 	users := usecase.NewUsers(userRepository, &passwordParams)
-	chats := usecase.NewChats(messengerRepository)
+	chats := usecase.NewChats(messengerRepository, userRepository)
 	messages := usecase.NewMessages(messengerRepository, gatewayClient)
 
 	errs := make(chan error, 1)

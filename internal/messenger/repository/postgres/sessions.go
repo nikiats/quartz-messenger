@@ -2,25 +2,20 @@ package postgres
 
 import (
 	"context"
-	"errors"
 	"quaztz/internal/messenger/domain"
 	"quaztz/internal/messenger/repository/postgres/db"
-	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Sessions struct {
-	pool *pgxpool.Pool
-	q    *db.Queries
+	q *db.Queries
 }
 
 func NewSessions(pool *pgxpool.Pool) *Sessions {
 	return &Sessions{
-		pool: pool,
-		q:    db.New(pool),
+		q: db.New(pool),
 	}
 }
 
@@ -35,50 +30,29 @@ func (r *Sessions) CreateSession(ctx context.Context, session domain.Session, re
 
 func (r *Sessions) RefreshSession(
 	ctx context.Context,
+	session domain.Session,
 	oldRefreshTokenHash, newRefreshTokenHash string,
-	expiresAt time.Time,
-) (domain.Session, error) {
-	var session domain.Session
-
-	err := inTx(ctx, r.pool, r.q, func(q *db.Queries) error {
-		row, err := q.GetSessionForRefresh(ctx, oldRefreshTokenHash)
-		switch {
-		case errors.Is(err, pgx.ErrNoRows):
-			return domain.ErrTokenInvalid
-		case err != nil:
-			return err
-		case row.RevokedAt != nil:
-			return domain.ErrSessionRevoked
-		case row.ExpiresAt.Before(time.Now()):
-			return domain.ErrTokenExpired
-		case row.Suspended:
-			return domain.ErrSuspendedUser
-		}
-
-		err = q.UpdateRefreshToken(ctx, db.UpdateRefreshTokenParams{
-			ID:               row.ID,
-			RefreshTokenHash: newRefreshTokenHash,
-			ExpiresAt:        expiresAt,
-		})
-		if err != nil {
-			return err
-		}
-
-		session = domain.Session{
-			UserID:    row.UserID,
-			SessionID: row.ID,
-			ExpiresAt: expiresAt,
-		}
-		return nil
+) error {
+	affected, err := r.q.RefreshSession(ctx, db.RefreshSessionParams{
+		UserID:              session.UserID,
+		ID:                  session.SessionID,
+		RefreshTokenHash:    oldRefreshTokenHash,
+		NewRefreshTokenHash: newRefreshTokenHash,
+		ExpiresAt:           session.ExpiresAt,
 	})
-
-	return session, err
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return domain.ErrTokenInvalid
+	}
+	return nil
 }
 
 func (r *Sessions) RevokeSession(ctx context.Context, userID, sessionID uuid.UUID) error {
 	affected, err := r.q.RevokeSession(ctx, db.RevokeSessionParams{
-		ID:     sessionID,
 		UserID: userID,
+		ID:     sessionID,
 	})
 	if err != nil {
 		return err

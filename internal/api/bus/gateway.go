@@ -8,9 +8,9 @@ import (
 
 // SubjectGatewayMessage
 type MessageEvent struct {
-	ChatID       uuid.UUID      `json:"chatId"`
+	ChatID       int64          `json:"chatId,string"`
+	MessageID    int64          `json:"messageId,string"`
 	SenderID     uuid.UUID      `json:"senderId"`
-	Seqnum       int64          `json:"seqnum"`
 	Content      MessageContent `json:"content"`
 	SentAt       time.Time      `json:"sentAt"`
 	RecipientIDs []uuid.UUID    `json:"recipientIds"`

@@ -51,7 +51,7 @@ func (s *Subscriber) handleGatewayMessage(msg *nats.Msg) {
 	message := connection.Message{
 		ChatID:   event.ChatID,
 		SenderID: event.SenderID,
-		Seqnum:   event.Seqnum,
+		ID:       event.MessageID,
 		Content:  event.Content.Text,
 		SentAt:   event.SentAt,
 	}

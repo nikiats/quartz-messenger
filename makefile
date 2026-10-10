@@ -1,4 +1,4 @@
-.PHONY: gen sqlc build migrate-up migrate-down migrate-status migrate-create web-dev infra-up up down cqlsh
+.PHONY: gen sqlc cqlgen build migrate-up migrate-down migrate-status migrate-create web-dev infra-up up down cqlsh
 
 -include deploy/messenger.env
 
@@ -10,6 +10,11 @@ gen:
 
 sqlc:
 	sqlc generate -f internal/messenger/repository/postgres/sqlc.yaml
+
+# запускается в сети docker: адрес контейнера Cassandra недоступен с хоста
+cqlgen:
+	docker run --rm --network quaztz_default -v "$(CURDIR)":/src -v quaztz-gomod:/go/pkg/mod -w /src golang:1.26-alpine \
+		go tool schemagen -cluster=cassandra -keyspace=quaztz -output=internal/messenger/repository/cassandra/db -pkgname=db
 
 build:
 	go build ./...

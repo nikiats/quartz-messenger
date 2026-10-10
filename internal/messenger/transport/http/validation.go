@@ -39,6 +39,9 @@ func validateChatCreate(userID uuid.UUID, chat *api.ChatCreate) error {
 			return errors.New("exactly 1 member for private chat needed")
 		}
 	case api.ChatCreateTypeGroup:
+		if chat.ClientRequestId == nil {
+			return errors.New("clientRequestId is required")
+		}
 		if chat.Title == nil {
 			return errors.New("title is required")
 		}

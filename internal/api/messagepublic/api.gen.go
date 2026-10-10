@@ -19,6 +19,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bwmarrin/snowflake"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/oapi-codegen/runtime"
 	openapi_types "github.com/oapi-codegen/runtime/types"
@@ -197,9 +198,11 @@ func (e MemberRole) Valid() bool {
 
 // Chat defines model for Chat.
 type Chat struct {
-	Id            openapi_types.UUID `json:"id"`
-	LastMessageAt time.Time          `json:"lastMessageAt"`
-	LastSeqnum    int64              `json:"lastSeqnum"`
+	// Id Snowflake ID. Передается строкой: 64-битное число не помещается в number JavaScript.
+	Id Snowflake `json:"id"`
+
+	// LastMessage Последнее сообщение чата. Отсутствует, если в чате нет сообщений.
+	LastMessage *LastMessage `json:"lastMessage,omitempty"`
 
 	// Title Название чата. В случае с личным чатом подставляется отображаемое имя собеседника.
 	Title *string  `json:"title,omitempty"`
@@ -211,6 +214,9 @@ type ChatType string
 
 // ChatCreate defines model for ChatCreate.
 type ChatCreate struct {
+	// ClientRequestId Клиентский идентификатор запроса для повторной отправки без создания нового чата. Обязателен для группового чата.
+	ClientRequestId *openapi_types.UUID `json:"clientRequestId,omitempty"`
+
 	// MemberIds Список участников, добавляемых в чат, за исключением текущего пользователя. > Присутствие в списке текущего пользователя или повторяющихся идентификаторов делает запрос некорректным (400). > Для личного чата обязательно должен содержать единственного участника - собеседника, с которым создается чат.
 	MemberIds []openapi_types.UUID `json:"memberIds"`
 
@@ -294,10 +300,21 @@ type Error500 struct {
 // Error500Code Машиночитаемый код ошибки.
 type Error500Code string
 
+// LastMessage Последнее сообщение чата. Отсутствует, если в чате нет сообщений.
+type LastMessage struct {
+	// Id Snowflake ID. Передается строкой: 64-битное число не помещается в number JavaScript.
+	Id Snowflake `json:"id"`
+
+	// Preview Начало текста сообщения.
+	Preview  string             `json:"preview"`
+	SenderId openapi_types.UUID `json:"senderId"`
+}
+
 // Member defines model for Member.
 type Member struct {
-	Role   MemberRole         `json:"role"`
-	UserId openapi_types.UUID `json:"userId"`
+	JoinedAt time.Time          `json:"joinedAt"`
+	Role     MemberRole         `json:"role"`
+	UserId   openapi_types.UUID `json:"userId"`
 }
 
 // MemberRole defines model for Member.Role.
@@ -310,11 +327,14 @@ type MemberAdd struct {
 
 // Message defines model for Message.
 type Message struct {
-	ChatId   openapi_types.UUID `json:"chatId"`
-	Content  MessageContent     `json:"content"`
+	// ChatId Snowflake ID. Передается строкой: 64-битное число не помещается в number JavaScript.
+	ChatId  Snowflake      `json:"chatId"`
+	Content MessageContent `json:"content"`
+
+	// Id Snowflake ID. Передается строкой: 64-битное число не помещается в number JavaScript.
+	Id       Snowflake          `json:"id"`
 	SenderId openapi_types.UUID `json:"senderId"`
 	SentAt   time.Time          `json:"sentAt"`
-	Seqnum   int64              `json:"seqnum"`
 }
 
 // MessageContent defines model for MessageContent.
@@ -358,6 +378,9 @@ type SessionRefresh struct {
 	RefreshToken string `json:"refreshToken"`
 }
 
+// Snowflake Snowflake ID. Передается строкой: 64-битное число не помещается в number JavaScript.
+type Snowflake = snowflake.ID
+
 // User defines model for User.
 type User struct {
 	UserId      openapi_types.UUID `json:"userId"`
@@ -394,9 +417,12 @@ type Unauthorized = Error401
 
 // GetMessagesParams defines parameters for GetMessages.
 type GetMessagesParams struct {
-	Before *int64 `form:"before,omitempty" json:"before,omitempty"`
-	After  *int64 `form:"after,omitempty" json:"after,omitempty"`
-	Limit  *int   `form:"limit,omitempty" json:"limit,omitempty"`
+	// Before ID сообщения, до которого выполняется загрузка.
+	Before *Snowflake `form:"before,omitempty" json:"before,omitempty"`
+
+	// After ID сообщения, после которого выполняется загрузка.
+	After *Snowflake `form:"after,omitempty" json:"after,omitempty"`
+	Limit *int       `form:"limit,omitempty" json:"limit,omitempty"`
 
 	// Q Строка поиска: вхождение подстроки без учета регистра.
 	Q *string `form:"q,omitempty" json:"q,omitempty"`
@@ -438,25 +464,25 @@ type ServerInterface interface {
 	CreateChat(w http.ResponseWriter, r *http.Request)
 	// DeleteChat Удаление чата.
 	// (DELETE /chats/{id})
-	DeleteChat(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	DeleteChat(w http.ResponseWriter, r *http.Request, id Snowflake)
 	// GetChatInfo Получение информации о чате.
 	// (GET /chats/{id})
-	GetChatInfo(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	GetChatInfo(w http.ResponseWriter, r *http.Request, id Snowflake)
 	// GetChatMembers Участники чата.
 	// (GET /chats/{id}/members)
-	GetChatMembers(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	GetChatMembers(w http.ResponseWriter, r *http.Request, id Snowflake)
 	// AddChatMember Добавить участника.
 	// (POST /chats/{id}/members)
-	AddChatMember(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	AddChatMember(w http.ResponseWriter, r *http.Request, id Snowflake)
 	// DeleteChatMember Удаление участника.
 	// (DELETE /chats/{id}/members/{userId})
-	DeleteChatMember(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, userId openapi_types.UUID)
+	DeleteChatMember(w http.ResponseWriter, r *http.Request, id Snowflake, userId openapi_types.UUID)
 	// GetMessages История сообщений чата.
 	// (GET /chats/{id}/messages)
-	GetMessages(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params GetMessagesParams)
+	GetMessages(w http.ResponseWriter, r *http.Request, id Snowflake, params GetMessagesParams)
 	// SendMessage Отправка сообщения.
 	// (POST /chats/{id}/messages)
-	SendMessage(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	SendMessage(w http.ResponseWriter, r *http.Request, id Snowflake)
 	// EditProfile Изменение настроек профиля пользователя.
 	// (PATCH /profile)
 	EditProfile(w http.ResponseWriter, r *http.Request)
@@ -524,9 +550,9 @@ func (siw *ServerInterfaceWrapper) DeleteChat(w http.ResponseWriter, r *http.Req
 	_ = err
 
 	// ------------- Path parameter "id" -------------
-	var id openapi_types.UUID
+	var id Snowflake
 
-	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
 	if err != nil {
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
 		return
@@ -550,9 +576,9 @@ func (siw *ServerInterfaceWrapper) GetChatInfo(w http.ResponseWriter, r *http.Re
 	_ = err
 
 	// ------------- Path parameter "id" -------------
-	var id openapi_types.UUID
+	var id Snowflake
 
-	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
 	if err != nil {
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
 		return
@@ -576,9 +602,9 @@ func (siw *ServerInterfaceWrapper) GetChatMembers(w http.ResponseWriter, r *http
 	_ = err
 
 	// ------------- Path parameter "id" -------------
-	var id openapi_types.UUID
+	var id Snowflake
 
-	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
 	if err != nil {
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
 		return
@@ -602,9 +628,9 @@ func (siw *ServerInterfaceWrapper) AddChatMember(w http.ResponseWriter, r *http.
 	_ = err
 
 	// ------------- Path parameter "id" -------------
-	var id openapi_types.UUID
+	var id Snowflake
 
-	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
 	if err != nil {
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
 		return
@@ -628,9 +654,9 @@ func (siw *ServerInterfaceWrapper) DeleteChatMember(w http.ResponseWriter, r *ht
 	_ = err
 
 	// ------------- Path parameter "id" -------------
-	var id openapi_types.UUID
+	var id Snowflake
 
-	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
 	if err != nil {
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
 		return
@@ -663,9 +689,9 @@ func (siw *ServerInterfaceWrapper) GetMessages(w http.ResponseWriter, r *http.Re
 	_ = err
 
 	// ------------- Path parameter "id" -------------
-	var id openapi_types.UUID
+	var id Snowflake
 
-	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
 	if err != nil {
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
 		return
@@ -676,7 +702,7 @@ func (siw *ServerInterfaceWrapper) GetMessages(w http.ResponseWriter, r *http.Re
 
 	// ------------- Optional query parameter "before" -------------
 
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "before", r.URL.Query(), &params.Before, runtime.BindQueryParameterOptions{Type: "integer", Format: "int64"})
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "before", r.URL.Query(), &params.Before, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
 	if err != nil {
 		var requiredError *runtime.RequiredParameterError
 		if errors.As(err, &requiredError) {
@@ -689,7 +715,7 @@ func (siw *ServerInterfaceWrapper) GetMessages(w http.ResponseWriter, r *http.Re
 
 	// ------------- Optional query parameter "after" -------------
 
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "after", r.URL.Query(), &params.After, runtime.BindQueryParameterOptions{Type: "integer", Format: "int64"})
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "after", r.URL.Query(), &params.After, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
 	if err != nil {
 		var requiredError *runtime.RequiredParameterError
 		if errors.As(err, &requiredError) {
@@ -744,9 +770,9 @@ func (siw *ServerInterfaceWrapper) SendMessage(w http.ResponseWriter, r *http.Re
 	_ = err
 
 	// ------------- Path parameter "id" -------------
-	var id openapi_types.UUID
+	var id Snowflake
 
-	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
 	if err != nil {
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
 		return
@@ -1198,7 +1224,7 @@ func (response CreateChat500JSONResponse) VisitCreateChatResponse(w http.Respons
 }
 
 type DeleteChatRequestObject struct {
-	Id openapi_types.UUID `json:"id"`
+	Id Snowflake `json:"id"`
 }
 
 type DeleteChatResponseObject interface {
@@ -1270,7 +1296,7 @@ func (response DeleteChat500JSONResponse) VisitDeleteChatResponse(w http.Respons
 }
 
 type GetChatInfoRequestObject struct {
-	Id openapi_types.UUID `json:"id"`
+	Id Snowflake `json:"id"`
 }
 
 type GetChatInfoResponseObject interface {
@@ -1334,7 +1360,7 @@ func (response GetChatInfo500JSONResponse) VisitGetChatInfoResponse(w http.Respo
 }
 
 type GetChatMembersRequestObject struct {
-	Id openapi_types.UUID `json:"id"`
+	Id Snowflake `json:"id"`
 }
 
 type GetChatMembersResponseObject interface {
@@ -1398,7 +1424,7 @@ func (response GetChatMembers500JSONResponse) VisitGetChatMembersResponse(w http
 }
 
 type AddChatMemberRequestObject struct {
-	Id   openapi_types.UUID `json:"id"`
+	Id   Snowflake `json:"id"`
 	Body *AddChatMemberJSONRequestBody
 }
 
@@ -1499,7 +1525,7 @@ func (response AddChatMember500JSONResponse) VisitAddChatMemberResponse(w http.R
 }
 
 type DeleteChatMemberRequestObject struct {
-	Id     openapi_types.UUID `json:"id"`
+	Id     Snowflake          `json:"id"`
 	UserId openapi_types.UUID `json:"userId"`
 }
 
@@ -1572,7 +1598,7 @@ func (response DeleteChatMember500JSONResponse) VisitDeleteChatMemberResponse(w 
 }
 
 type GetMessagesRequestObject struct {
-	Id     openapi_types.UUID `json:"id"`
+	Id     Snowflake `json:"id"`
 	Params GetMessagesParams
 }
 
@@ -1654,7 +1680,7 @@ func (response GetMessages500JSONResponse) VisitGetMessagesResponse(w http.Respo
 }
 
 type SendMessageRequestObject struct {
-	Id   openapi_types.UUID `json:"id"`
+	Id   Snowflake `json:"id"`
 	Body *SendMessageJSONRequestBody
 }
 
@@ -2323,7 +2349,7 @@ func (sh *strictHandler) CreateChat(w http.ResponseWriter, r *http.Request) {
 }
 
 // DeleteChat operation middleware
-func (sh *strictHandler) DeleteChat(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+func (sh *strictHandler) DeleteChat(w http.ResponseWriter, r *http.Request, id Snowflake) {
 	var request DeleteChatRequestObject
 
 	request.Id = id
@@ -2349,7 +2375,7 @@ func (sh *strictHandler) DeleteChat(w http.ResponseWriter, r *http.Request, id o
 }
 
 // GetChatInfo operation middleware
-func (sh *strictHandler) GetChatInfo(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+func (sh *strictHandler) GetChatInfo(w http.ResponseWriter, r *http.Request, id Snowflake) {
 	var request GetChatInfoRequestObject
 
 	request.Id = id
@@ -2375,7 +2401,7 @@ func (sh *strictHandler) GetChatInfo(w http.ResponseWriter, r *http.Request, id 
 }
 
 // GetChatMembers operation middleware
-func (sh *strictHandler) GetChatMembers(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+func (sh *strictHandler) GetChatMembers(w http.ResponseWriter, r *http.Request, id Snowflake) {
 	var request GetChatMembersRequestObject
 
 	request.Id = id
@@ -2401,7 +2427,7 @@ func (sh *strictHandler) GetChatMembers(w http.ResponseWriter, r *http.Request, 
 }
 
 // AddChatMember operation middleware
-func (sh *strictHandler) AddChatMember(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+func (sh *strictHandler) AddChatMember(w http.ResponseWriter, r *http.Request, id Snowflake) {
 	var request AddChatMemberRequestObject
 
 	request.Id = id
@@ -2434,7 +2460,7 @@ func (sh *strictHandler) AddChatMember(w http.ResponseWriter, r *http.Request, i
 }
 
 // DeleteChatMember operation middleware
-func (sh *strictHandler) DeleteChatMember(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, userId openapi_types.UUID) {
+func (sh *strictHandler) DeleteChatMember(w http.ResponseWriter, r *http.Request, id Snowflake, userId openapi_types.UUID) {
 	var request DeleteChatMemberRequestObject
 
 	request.Id = id
@@ -2461,7 +2487,7 @@ func (sh *strictHandler) DeleteChatMember(w http.ResponseWriter, r *http.Request
 }
 
 // GetMessages operation middleware
-func (sh *strictHandler) GetMessages(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params GetMessagesParams) {
+func (sh *strictHandler) GetMessages(w http.ResponseWriter, r *http.Request, id Snowflake, params GetMessagesParams) {
 	var request GetMessagesRequestObject
 
 	request.Id = id
@@ -2488,7 +2514,7 @@ func (sh *strictHandler) GetMessages(w http.ResponseWriter, r *http.Request, id 
 }
 
 // SendMessage operation middleware
-func (sh *strictHandler) SendMessage(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+func (sh *strictHandler) SendMessage(w http.ResponseWriter, r *http.Request, id Snowflake) {
 	var request SendMessageRequestObject
 
 	request.Id = id
@@ -2727,71 +2753,76 @@ func (sh *strictHandler) GetUserInfo(w http.ResponseWriter, r *http.Request, id 
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
-	"du/u/icAAP//",
+	"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",
+	"2lrtfwEAAP//",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

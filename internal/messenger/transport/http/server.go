@@ -8,6 +8,9 @@ import (
 	"net/http"
 	api "quaztz/internal/api/messagepublic"
 	"quaztz/internal/messenger/domain"
+
+	"github.com/bwmarrin/snowflake"
+	"github.com/google/uuid"
 )
 
 type server struct {
@@ -39,7 +42,7 @@ func NewHandler(c Chats, u Users, m Messages, a Authenticator, s Sessions) http.
 func (s server) AddChatMember(ctx context.Context, req api.AddChatMemberRequestObject) (api.AddChatMemberResponseObject, error) {
 	userID := sessionFrom(ctx).UserID
 	memberID := req.Body.UserId
-	chatID := req.Id
+	chatID := int64(req.Id)
 	err := s.c.AddMember(ctx, userID, chatID, memberID)
 
 	switch {
@@ -96,7 +99,11 @@ func (s server) CreateChat(ctx context.Context, req api.CreateChatRequestObject)
 	if create.Title != nil {
 		title = *create.Title
 	}
-	chat, created, err := s.c.Create(ctx, userID, domain.ChatType(create.Type), title, create.MemberIds)
+	var clientRequestID uuid.UUID
+	if create.ClientRequestId != nil {
+		clientRequestID = *create.ClientRequestId
+	}
+	chat, created, err := s.c.Create(ctx, userID, domain.ChatType(create.Type), title, create.MemberIds, clientRequestID)
 
 	switch {
 	case errors.Is(err, domain.ErrUserNotFound):
@@ -110,14 +117,7 @@ func (s server) CreateChat(ctx context.Context, req api.CreateChatRequestObject)
 		return nil, err
 	}
 
-	response := api.Chat{
-		Id:            chat.ID,
-		Type:          api.ChatType(chat.Type),
-		Title:         &chat.Title,
-		LastSeqnum:    chat.LastSeqnum,
-		LastMessageAt: chat.LastMessageAt,
-	}
-
+	response := chatResponse(chat)
 	if created {
 		return api.CreateChat201JSONResponse(response), nil
 	}
@@ -126,7 +126,7 @@ func (s server) CreateChat(ctx context.Context, req api.CreateChatRequestObject)
 
 func (s server) DeleteChat(ctx context.Context, req api.DeleteChatRequestObject) (api.DeleteChatResponseObject, error) {
 	userID := sessionFrom(ctx).UserID
-	chatID := req.Id
+	chatID := int64(req.Id)
 	err := s.c.Delete(ctx, userID, chatID)
 
 	switch {
@@ -154,7 +154,7 @@ func (s server) DeleteChat(ctx context.Context, req api.DeleteChatRequestObject)
 func (s server) DeleteChatMember(ctx context.Context, req api.DeleteChatMemberRequestObject) (api.DeleteChatMemberResponseObject, error) {
 	userID := sessionFrom(ctx).UserID
 	memberID := req.UserId
-	chatID := req.Id
+	chatID := int64(req.Id)
 	err := s.c.RemoveMember(ctx, userID, chatID, memberID)
 
 	switch {
@@ -225,7 +225,7 @@ func (s server) EditProfile(ctx context.Context, req api.EditProfileRequestObjec
 
 func (s server) GetChatInfo(ctx context.Context, req api.GetChatInfoRequestObject) (api.GetChatInfoResponseObject, error) {
 	userID := sessionFrom(ctx).UserID
-	chatID := req.Id
+	chatID := int64(req.Id)
 	chat, err := s.c.Get(ctx, userID, chatID)
 
 	switch {
@@ -240,18 +240,12 @@ func (s server) GetChatInfo(ctx context.Context, req api.GetChatInfoRequestObjec
 		return nil, err
 	}
 
-	return api.GetChatInfo200JSONResponse{
-		Id:            chat.ID,
-		Type:          api.ChatType(chat.Type),
-		Title:         &chat.Title,
-		LastSeqnum:    chat.LastSeqnum,
-		LastMessageAt: chat.LastMessageAt,
-	}, nil
+	return api.GetChatInfo200JSONResponse(chatResponse(chat)), nil
 }
 
 func (s server) GetChatMembers(ctx context.Context, req api.GetChatMembersRequestObject) (api.GetChatMembersResponseObject, error) {
 	userID := sessionFrom(ctx).UserID
-	chatID := req.Id
+	chatID := int64(req.Id)
 	members, err := s.c.Members(ctx, userID, chatID)
 
 	switch {
@@ -269,8 +263,9 @@ func (s server) GetChatMembers(ctx context.Context, req api.GetChatMembersReques
 	response := make(api.GetChatMembers200JSONResponse, 0, len(members))
 	for _, member := range members {
 		response = append(response, api.Member{
-			UserId: member.UserID,
-			Role:   api.MemberRole(member.Role),
+			UserId:   member.UserID,
+			Role:     api.MemberRole(member.Role),
+			JoinedAt: member.JoinedAt,
 		})
 	}
 
@@ -286,13 +281,7 @@ func (s server) GetChats(ctx context.Context, _ api.GetChatsRequestObject) (api.
 
 	response := make(api.GetChats200JSONResponse, 0, len(chats))
 	for _, chat := range chats {
-		response = append(response, api.Chat{
-			Id:            chat.ID,
-			Type:          api.ChatType(chat.Type),
-			Title:         &chat.Title,
-			LastSeqnum:    chat.LastSeqnum,
-			LastMessageAt: chat.LastMessageAt,
-		})
+		response = append(response, chatResponse(chat))
 	}
 
 	return response, nil
@@ -300,7 +289,7 @@ func (s server) GetChats(ctx context.Context, _ api.GetChatsRequestObject) (api.
 
 func (s server) GetMessages(ctx context.Context, req api.GetMessagesRequestObject) (api.GetMessagesResponseObject, error) {
 	userID := sessionFrom(ctx).UserID
-	chatID := req.Id
+	chatID := int64(req.Id)
 	params := req.Params
 
 	if err := validateMessagesParams(params); err != nil {
@@ -313,8 +302,8 @@ func (s server) GetMessages(ctx context.Context, req api.GetMessagesRequestObjec
 	}
 
 	query := domain.MessageQuery{
-		Before: params.Before,
-		After:  params.After,
+		Before: (*int64)(params.Before),
+		After:  (*int64)(params.After),
 		Limit:  defaultMessagesLimit,
 	}
 	if params.Limit != nil {
@@ -340,9 +329,9 @@ func (s server) GetMessages(ctx context.Context, req api.GetMessagesRequestObjec
 	response := make([]api.Message, 0, len(messages))
 	for _, message := range messages {
 		response = append(response, api.Message{
-			ChatId:   message.ChatID,
+			Id:       snowflake.ID(message.ID),
+			ChatId:   snowflake.ID(message.ChatID),
 			SenderId: message.SenderID,
-			Seqnum:   message.Seqnum,
 			SentAt:   message.SentAt,
 			Content: api.MessageContent{
 				Text: message.Content.Text,
@@ -532,7 +521,7 @@ func (s server) SearchUsers(ctx context.Context, req api.SearchUsersRequestObjec
 
 func (s server) SendMessage(ctx context.Context, req api.SendMessageRequestObject) (api.SendMessageResponseObject, error) {
 	senderID := sessionFrom(ctx).UserID
-	chatID := req.Id
+	chatID := int64(req.Id)
 	send := req.Body
 
 	if err := validateSendMessage(send); err != nil {
@@ -562,14 +551,30 @@ func (s server) SendMessage(ctx context.Context, req api.SendMessageRequestObjec
 	}
 
 	return api.SendMessage201JSONResponse{
-		ChatId:   message.ChatID,
+		Id:       snowflake.ID(message.ID),
+		ChatId:   snowflake.ID(message.ChatID),
 		SenderId: message.SenderID,
-		Seqnum:   message.Seqnum,
 		SentAt:   message.SentAt,
 		Content: api.MessageContent{
 			Text: message.Content.Text,
 		},
 	}, nil
+}
+
+func chatResponse(chat domain.Chat) api.Chat {
+	response := api.Chat{
+		Id:    snowflake.ID(chat.ID),
+		Type:  api.ChatType(chat.Type),
+		Title: &chat.Title,
+	}
+	if chat.Activity.LastMessageID != 0 {
+		response.LastMessage = &api.LastMessage{
+			Id:       snowflake.ID(chat.Activity.LastMessageID),
+			SenderId: chat.Activity.LastMessageSenderID,
+			Preview:  chat.Activity.LastMessagePreview,
+		}
+	}
+	return response
 }
 
 func unauthorized(w http.ResponseWriter, _ *http.Request, code api.Error401Code) {

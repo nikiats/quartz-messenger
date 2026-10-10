@@ -33,24 +33,26 @@ type Chats interface {
 		chatType domain.ChatType,
 		title string,
 		memberIDs []uuid.UUID,
+		clientRequestID uuid.UUID,
 	) (chat domain.Chat, created bool, err error)
-	Get(ctx context.Context, userID, chatID uuid.UUID) (domain.Chat, error)
-	Delete(ctx context.Context, userID, chatID uuid.UUID) error
-	Members(ctx context.Context, userID, chatID uuid.UUID) ([]domain.Member, error)
-	AddMember(ctx context.Context, userID, chatID, memberID uuid.UUID) error
-	RemoveMember(ctx context.Context, userID, chatID, memberID uuid.UUID) error
+	Get(ctx context.Context, userID uuid.UUID, chatID int64) (domain.Chat, error)
+	Delete(ctx context.Context, userID uuid.UUID, chatID int64) error
+	Members(ctx context.Context, userID uuid.UUID, chatID int64) ([]domain.Member, error)
+	AddMember(ctx context.Context, userID uuid.UUID, chatID int64, memberID uuid.UUID) error
+	RemoveMember(ctx context.Context, userID uuid.UUID, chatID int64, memberID uuid.UUID) error
 }
 
 type Messages interface {
 	History(
 		ctx context.Context,
-		userID, chatID uuid.UUID,
+		userID uuid.UUID,
+		chatID int64,
 		query domain.MessageQuery,
 	) (messages []domain.Message, hasMore bool, err error)
 	Send(
 		ctx context.Context,
 		senderID uuid.UUID,
-		chatID uuid.UUID,
+		chatID int64,
 		clientMessageID uuid.UUID,
 		content domain.MessageContent,
 	) (domain.Message, error)

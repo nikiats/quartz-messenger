@@ -255,8 +255,7 @@ paths:
           in: path
           required: true
           schema:
-            type: string
-            format: uuid
+            $ref: "#/components/schemas/Snowflake"
       responses:
         "200":
           description: "Информация о чате."
@@ -281,8 +280,7 @@ paths:
           in: path
           required: true
           schema:
-            type: string
-            format: uuid
+            $ref: "#/components/schemas/Snowflake"
       responses:
         "204":
           description: "Чат удален."
@@ -309,20 +307,17 @@ paths:
           in: path
           required: true
           schema:
-            type: string
-            format: uuid
+            $ref: "#/components/schemas/Snowflake"
         - name: before
           in: query
+          description: "ID сообщения, до которого выполняется загрузка."
           schema:
-            type: integer
-            format: int64
-            minimum: 1
+            $ref: "#/components/schemas/Snowflake"
         - name: after
           in: query
+          description: "ID сообщения, после которого выполняется загрузка."
           schema:
-            minimum: 0
-            type: integer
-            format: int64
+            $ref: "#/components/schemas/Snowflake"
         - name: limit
           in: query
           schema:
@@ -375,8 +370,7 @@ paths:
           in: path
           required: true
           schema:
-            type: string
-            format: uuid
+            $ref: "#/components/schemas/Snowflake"
       requestBody:
         required: true
         content:
@@ -410,8 +404,7 @@ paths:
           in: path
           required: true
           schema:
-            type: string
-            format: uuid
+            $ref: "#/components/schemas/Snowflake"
       responses:
         "200":
           description: "Участники чата."
@@ -438,8 +431,7 @@ paths:
           in: path
           required: true
           schema:
-            type: string
-            format: uuid
+            $ref: "#/components/schemas/Snowflake"
       requestBody:
         required: true
         content:
@@ -481,8 +473,7 @@ paths:
           in: path
           required: true
           schema:
-            type: string
-            format: uuid
+            $ref: "#/components/schemas/Snowflake"
         - name: userId
           in: path
           required: true
@@ -614,12 +605,19 @@ components:
           minLength: 3
           maxLength: 24
 
+    Snowflake:
+      description: "Snowflake ID. Передается строкой: 64-битное число не помещается в number JavaScript."
+      type: string
+      pattern: "^[0-9]{1,19}$"
+      x-go-type: snowflake.ID
+      x-go-type-import:
+        path: github.com/bwmarrin/snowflake
+
     Chat:
       type: object
       properties:
         id:
-          type: string
-          format: uuid
+          $ref: "#/components/schemas/Snowflake"
         type:
           type: string
           enum:
@@ -628,17 +626,28 @@ components:
         title:
           description: "Название чата. В случае с личным чатом подставляется отображаемое имя собеседника."
           type: string
-        lastMessageAt:
-          type: string
-          format: "date-time"
-        lastSeqnum:
-          type: integer
-          format: int64
+        lastMessage:
+          $ref: "#/components/schemas/LastMessage"
       required:
         - id
         - type
-        - lastSeqnum
-        - lastMessageAt
+
+    LastMessage:
+      description: "Последнее сообщение чата. Отсутствует, если в чате нет сообщений."
+      type: object
+      properties:
+        id:
+          $ref: "#/components/schemas/Snowflake"
+        senderId:
+          type: string
+          format: uuid
+        preview:
+          description: "Начало текста сообщения."
+          type: string
+      required:
+        - id
+        - senderId
+        - preview
 
     ChatCreate:
       type: object
@@ -663,6 +672,10 @@ components:
           items:
             type: string
             format: uuid
+        clientRequestId:
+          description: "Клиентский идентификатор запроса для повторной отправки без создания нового чата. Обязателен для группового чата."
+          type: string
+          format: uuid
       required:
         - type
         - memberIds
@@ -670,12 +683,10 @@ components:
     Message:
       type: object
       properties:
+        id:
+          $ref: "#/components/schemas/Snowflake"
         chatId:
-          type: string
-          format: uuid
-        seqnum:
-          type: integer
-          format: int64
+          $ref: "#/components/schemas/Snowflake"
         senderId:
           type: string
           format: uuid
@@ -685,10 +696,10 @@ components:
           type: string
           format: "date-time"
       required:
-        - seqnum
+        - id
+        - chatId
         - senderId
         - content
-        - chatId
         - sentAt
 
     SendMessage:
@@ -724,9 +735,13 @@ components:
           enum:
             - regular
             - admin
+        joinedAt:
+          type: string
+          format: "date-time"
       required:
         - userId
         - role
+        - joinedAt
 
     MemberAdd:
       type: object

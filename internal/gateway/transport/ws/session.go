@@ -266,7 +266,7 @@ func (s *clientSession) handleSendMessage(ctx context.Context, req sendMessageRe
 	}
 
 	resp.Success = true
-	resp.Seqnum = sent.Seqnum
+	resp.MessageID = sent.MessageID
 	resp.SentAt = sent.SentAt
 	return s.send(ctx, resp)
 }

@@ -14,7 +14,8 @@ var (
 
 // ошибки отправки сообщения
 var (
-	ErrChatNotFound = errors.New("chat not found")
+	ErrChatNotFound    = errors.New("chat not found")
+	ErrMessageNotFound = errors.New("message not found")
 )
 
 // ошибки пользователей
@@ -31,4 +32,6 @@ var (
 	ErrRequiresAdmin         = errors.New("need to be admin")
 	ErrAddToPrivateChat      = errors.New("forbidden to add to private chat")
 	ErrRemoveFromPrivateChat = errors.New("forbidden to remove from private chat")
+	ErrChatExists            = errors.New("chat already exists")
+	ErrChatConflict          = errors.New("chat was changed concurrently")
 )

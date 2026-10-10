@@ -201,9 +201,7 @@ components:
           const: sendMessage
           description: Метод сообщения.
         chatId:
-          type: string
-          format: uuid
-          description: Идентификатор чата.
+          $ref: "#/components/schemas/Snowflake"
         content:
           $ref: "#/components/schemas/MessageContent"
         clientMessageId:
@@ -228,10 +226,8 @@ components:
           description: "Успешность отправки сообщения."
         error:
           $ref: "#/components/schemas/ErrorBody"
-        seqnum:
-          type: integer
-          format: int64
-          description: Порядковый номер сообщения.
+        messageId:
+          $ref: "#/components/schemas/Snowflake"
         sentAt:
           type: string
           format: "date-time"
@@ -239,30 +235,31 @@ components:
 
     ReceiveMessagePayload:
       type: object
-      required: [method, chatId, senderId, content, seqnum, sentAt]
+      required: [method, chatId, messageId, senderId, content, sentAt]
       properties:
         method:
           type: string
           const: receiveMessage
           description: Метод сообщения.
         chatId:
-          type: string
-          format: uuid
-          description: Идентификатор чата.
+          $ref: "#/components/schemas/Snowflake"
+        messageId:
+          $ref: "#/components/schemas/Snowflake"
         senderId:
           type: string
           format: uuid
           description: Идентификатор отправителя.
         content:
           $ref: "#/components/schemas/MessageContent"
-        seqnum:
-          type: integer
-          format: int64
-          description: Порядковый номер сообщения.
         sentAt:
           type: string
           format: "date-time"
           description: Время отправки сообщения.
+
+    Snowflake:
+      type: string
+      pattern: "^[0-9]{1,19}$"
+      description: "Snowflake ID. Передается строкой: 64-битное число не помещается в number JavaScript."
 
     MessageContent:
       type: object

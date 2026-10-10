@@ -21,7 +21,7 @@ type MessageContent struct {
 }
 
 type Message struct {
-	ChatID          uuid.UUID
+	ChatID          int64
 	SenderID        uuid.UUID
 	SessionID       uuid.UUID
 	ClientMessageID uuid.UUID
@@ -29,8 +29,8 @@ type Message struct {
 }
 
 type Sent struct {
-	Seqnum int64
-	SentAt time.Time
+	MessageID int64
+	SentAt    time.Time
 }
 
 // запросы к мессенджерам через NATS
@@ -80,7 +80,7 @@ func (m *Messenger) SendMessage(ctx context.Context, message Message) (Sent, err
 		return Sent{}, ErrInternal
 	}
 	return Sent{
-		Seqnum: resp.Seqnum,
-		SentAt: resp.SentAt,
+		MessageID: resp.MessageID,
+		SentAt:    resp.SentAt,
 	}, nil
 }

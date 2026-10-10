@@ -11,9 +11,9 @@ type MessageContent struct {
 }
 
 type Message struct {
-	ChatID   uuid.UUID
+	ID       int64
+	ChatID   int64
 	SenderID uuid.UUID
-	Seqnum   int64
 	SentAt   time.Time
 	Content  MessageContent
 }
