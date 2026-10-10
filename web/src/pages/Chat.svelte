@@ -13,7 +13,7 @@
 	import { auth } from '../lib/auth.svelte.js';
 	import { formatDate, isSameDay } from '../lib/format.js';
 	import { getChat, type Chat } from '../lib/chats.js';
-	import { getMessages, sendMessage, type Message } from '../lib/messages.js';
+	import { compareIds, getMessages, newestId, sendMessage, type Message } from '../lib/messages.js';
 	import { connection, subscribe } from '../lib/ws.svelte.js';
 	import { setOpenedChat } from '../lib/unread.svelte.js';
 	import { clearAlert, showAlert } from '../lib/alert.svelte.js';
@@ -24,7 +24,7 @@
 
 	type Bubble = {
 		key: string;
-		seqnum: number | null;
+		id: string | null;
 		senderId: string;
 		sentAt: string;
 		text: string;
@@ -35,7 +35,7 @@
 	let messages = $state<Bubble[]>([]);
 	let pending = $state<Bubble[]>([]);
 	let hasMore = $state(false);
-	let freshFrom = $state(Infinity);
+	let freshAfter = $state<string | null>(null);
 	let text = $state('');
 	let searchOpen = $state(false);
 	let infoOpen = $state(false);
@@ -48,8 +48,8 @@
 
 	function toBubble(message: Message): Bubble {
 		return {
-			key: String(message.seqnum),
-			seqnum: message.seqnum,
+			key: message.id,
+			id: message.id,
 			senderId: message.senderId,
 			sentAt: message.sentAt,
 			text: message.content.text,
@@ -57,9 +57,9 @@
 	}
 
 	function addMessages(added: Bubble[]) {
-		const known = new Set(messages.map((bubble) => bubble.seqnum));
-		const unique = added.filter((bubble) => !known.has(bubble.seqnum));
-		messages = [...messages, ...unique].sort((a, b) => a.seqnum! - b.seqnum!);
+		const known = new Set(messages.map((bubble) => bubble.id));
+		const unique = added.filter((bubble) => !known.has(bubble.id));
+		messages = [...messages, ...unique].sort((a, b) => compareIds(a.id!, b.id!));
 	}
 
 	function onScroll() {
@@ -73,21 +73,21 @@
 		feed.scrollTo({ top: 0, behavior: 'smooth' });
 	}
 
-	function lastSeqnum(): number {
-		return messages.at(-1)?.seqnum ?? 0;
+	function lastId(): string {
+		return messages.at(-1)?.id ?? '0';
 	}
 
 	async function load(chatId: string): Promise<boolean> {
 		try {
 			const loaded = await getChat(chatId);
-			const page = await getMessages(chatId, 'before', loaded.lastSeqnum + 1);
+			const page = await getMessages(chatId, 'before', newestId);
 			if (chatId !== currentChatId) {
 				return false;
 			}
 
 			addMessages(page.messages.map(toBubble));
 			hasMore = page.hasMore;
-			freshFrom = lastSeqnum() + 1;
+			freshAfter = lastId();
 			chat = loaded;
 			return true;
 		} catch (err) {
@@ -98,7 +98,7 @@
 
 	async function loadOlder() {
 		try {
-			const page = await getMessages(params.id, 'before', messages[0].seqnum!);
+			const page = await getMessages(params.id, 'before', messages[0].id!);
 			addMessages(page.messages.map(toBubble));
 			hasMore = page.hasMore;
 		} catch (err) {
@@ -106,7 +106,7 @@
 		}
 	}
 
-	async function loadNewer(chatId: string, after: number) {
+	async function loadNewer(chatId: string, after: string) {
 		try {
 			let page;
 			do {
@@ -116,7 +116,7 @@
 				}
 
 				addMessages(page.messages.map(toBubble));
-				after = page.messages.at(-1)?.seqnum ?? after;
+				after = page.messages.at(-1)?.id ?? after;
 			} while (page.hasMore && page.messages.length > 0);
 		} catch (err) {
 			showAlert('error', (err as Error).message);
@@ -132,7 +132,7 @@
 		messages = [];
 		pending = [];
 		hasMore = false;
-		freshFrom = Infinity;
+		freshAfter = null;
 		untrack(() => {
 			setOpenedChat(chatId);
 
@@ -142,7 +142,7 @@
 				}
 
 				ready = true;
-				loadNewer(chatId, lastSeqnum());
+				loadNewer(chatId, lastId());
 			});
 		});
 
@@ -152,18 +152,14 @@
 			}
 
 			if (event.method === 'receiveMessage' && event.chatId === chatId) {
-				const last = lastSeqnum();
-				addMessages([toBubble(event)]);
+				addMessages([toBubble({ ...event, id: event.messageId })]);
 				if (scrolledUp) {
 					unseen += 1;
-				}
-				if (event.seqnum > last + 1) {
-					loadNewer(chatId, last);
 				}
 			}
 
 			if (event.method === 'authorizeResponse' && event.success) {
-				loadNewer(chatId, lastSeqnum());
+				loadNewer(chatId, lastId());
 			}
 		});
 
@@ -181,7 +177,7 @@
 
 		const chatId = chat.id;
 		const timer = setInterval(async () => {
-			const page = await getMessages(chatId, 'after', lastSeqnum()).catch(() => null);
+			const page = await getMessages(chatId, 'after', lastId()).catch(() => null);
 			if (page) {
 				addMessages(page.messages.map(toBubble));
 			}
@@ -192,7 +188,7 @@
 	function send() {
 		const bubble: Bubble = {
 			key: uuid(),
-			seqnum: null,
+			id: null,
 			senderId: auth.session!.userId,
 			sentAt: new Date().toISOString(),
 			text,
@@ -210,7 +206,7 @@
 		if (bubble.failed) {
 			return 'failed';
 		}
-		return bubble.seqnum === null ? 'pending' : 'sent';
+		return bubble.id === null ? 'pending' : 'sent';
 	}
 
 	function discard(bubble: Bubble) {
@@ -223,7 +219,7 @@
 		try {
 			const sent = await sendMessage(params.id, bubble.key, bubble.text);
 			discard(bubble);
-			addMessages([{ ...bubble, seqnum: sent.seqnum, sentAt: sent.sentAt }]);
+			addMessages([{ ...bubble, id: sent.id, sentAt: sent.sentAt }]);
 			clearAlert();
 		} catch (err) {
 			pending = pending.map((item) => (item.key === bubble.key ? { ...item, failed: true } : item));
@@ -260,7 +256,7 @@
 					status={mine ? statusOf(bubble) : undefined}
 					{mine}
 					{first}
-					fresh={bubble.seqnum === null || bubble.seqnum >= freshFrom}
+					fresh={bubble.id === null || (freshAfter !== null && compareIds(bubble.id, freshAfter) > 0)}
 					senderId={chat?.type === 'group' && !mine && first ? bubble.senderId : undefined}
 					onretry={() => retry(bubble)}
 					ondiscard={() => discard(bubble)}

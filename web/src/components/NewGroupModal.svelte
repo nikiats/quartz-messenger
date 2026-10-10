@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { push } from 'svelte-spa-router';
+	import { v4 as uuid } from 'uuid';
 	import Modal from './Modal.svelte';
 	import Input from './Input.svelte';
 	import Button from './Button.svelte';
@@ -17,6 +18,8 @@
 	let title = $state('');
 	let members = $state<User[]>([]);
 	let creating = $state(false);
+
+	const requestId = uuid();
 
 	function isMember(user: User): boolean {
 		return members.some((member) => member.userId === user.userId);
@@ -39,6 +42,7 @@
 				'group',
 				members.map((member) => member.userId),
 				title,
+				requestId,
 			);
 			clearAlert();
 			onclose();

@@ -119,6 +119,37 @@ func (q *Queries) GetUser(ctx context.Context, id uuid.UUID) (GetUserRow, error)
 	return i, err
 }
 
+const getVisibleNames = `-- name: GetVisibleNames :many
+SELECT id, visible_name
+  FROM users
+ WHERE id = ANY($1::uuid[])
+`
+
+type GetVisibleNamesRow struct {
+	ID          uuid.UUID
+	VisibleName string
+}
+
+func (q *Queries) GetVisibleNames(ctx context.Context, ids []uuid.UUID) ([]GetVisibleNamesRow, error) {
+	rows, err := q.db.Query(ctx, getVisibleNames, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetVisibleNamesRow
+	for rows.Next() {
+		var i GetVisibleNamesRow
+		if err := rows.Scan(&i.ID, &i.VisibleName); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const isActiveUser = `-- name: IsActiveUser :one
 SELECT EXISTS (
     SELECT 1 FROM users WHERE id = $1 AND NOT suspended

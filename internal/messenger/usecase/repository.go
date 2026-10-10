@@ -32,6 +32,7 @@ type MessengerRepository interface {
 type UserRepository interface {
 	CreateUser(ctx context.Context, userID uuid.UUID, login, passwordHash string) error
 	GetUser(ctx context.Context, userID uuid.UUID) (domain.User, error)
+	GetVisibleNames(ctx context.Context, userIDs []uuid.UUID) (map[uuid.UUID]string, error)
 	GetCredentials(ctx context.Context, login string) (domain.Credentials, error)
 	SearchUsers(ctx context.Context, username string, limit int) ([]domain.User, error)
 	UpdateProfile(ctx context.Context, userID uuid.UUID, visibleName, username *string) error

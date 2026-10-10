@@ -11,6 +11,11 @@ SELECT id, username, visible_name
   FROM users
  WHERE id = $1;
 
+-- name: GetVisibleNames :many
+SELECT id, visible_name
+  FROM users
+ WHERE id = ANY(@ids::uuid[]);
+
 -- name: GetCredentials :one
 SELECT id, password_hash, suspended
   FROM users

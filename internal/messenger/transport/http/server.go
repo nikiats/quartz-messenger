@@ -572,6 +572,7 @@ func chatResponse(chat domain.Chat) api.Chat {
 			Id:       snowflake.ID(chat.Activity.LastMessageID),
 			SenderId: chat.Activity.LastMessageSenderID,
 			Preview:  chat.Activity.LastMessagePreview,
+			SentAt:   chat.Activity.LastMessageSentAt,
 		}
 	}
 	return response

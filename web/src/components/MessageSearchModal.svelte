@@ -3,15 +3,13 @@
 	import Input from './Input.svelte';
 	import Button from './Button.svelte';
 	import { auth } from '../lib/auth.svelte.js';
-	import { searchMessages, type Message } from '../lib/messages.js';
+	import { newestId, searchMessages, type Message } from '../lib/messages.js';
 	import { getUser } from '../lib/users.js';
 	import { formatDay } from '../lib/format.js';
 	import { clearAlert, showAlert } from '../lib/alert.svelte.js';
 	import { messageQueryMaxLength, messageSearchDelay } from '../config/search.js';
 
 	let { chatId, onclose }: { chatId: string; onclose: () => void } = $props();
-
-	const newest = Number.MAX_SAFE_INTEGER;
 
 	let query = $state('');
 	let found = $state<Message[] | null>(null);
@@ -30,7 +28,7 @@
 
 	async function search(q: string) {
 		try {
-			const page = await searchMessages(chatId, q, newest);
+			const page = await searchMessages(chatId, q, newestId);
 			if (q !== query.trim()) {
 				return;
 			}
@@ -49,7 +47,7 @@
 		}
 
 		try {
-			const page = await searchMessages(chatId, query.trim(), found[found.length - 1].seqnum);
+			const page = await searchMessages(chatId, query.trim(), found[found.length - 1].id);
 			found = [...found, ...page.messages];
 			hasMore = page.hasMore;
 		} catch (err) {
@@ -63,7 +61,7 @@
 		<Input placeholder="Текст сообщения" bind:value={query} maxlength={messageQueryMaxLength} autofocus />
 	</div>
 
-	{#each found ?? [] as message (message.seqnum)}
+	{#each found ?? [] as message (message.id)}
 		<div class="result">
 			<div class="top">
 				<span class="sender">

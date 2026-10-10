@@ -69,6 +69,19 @@ func (r *Users) GetUser(ctx context.Context, userID uuid.UUID) (domain.User, err
 	return user, nil
 }
 
+func (r *Users) GetVisibleNames(ctx context.Context, userIDs []uuid.UUID) (map[uuid.UUID]string, error) {
+	rows, err := r.q.GetVisibleNames(ctx, userIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	names := make(map[uuid.UUID]string, len(rows))
+	for _, row := range rows {
+		names[row.ID] = row.VisibleName
+	}
+	return names, nil
+}
+
 func (r *Users) GetCredentials(ctx context.Context, login string) (domain.Credentials, error) {
 	row, err := r.q.GetCredentials(ctx, login)
 	if errors.Is(err, pgx.ErrNoRows) {

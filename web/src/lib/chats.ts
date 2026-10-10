@@ -4,13 +4,18 @@ export type Chat = {
 	id: string;
 	type: 'private' | 'group';
 	title?: string;
-	lastSeqnum: number;
-	lastMessageAt: string;
+	lastMessage?: {
+		id: string;
+		senderId: string;
+		preview: string;
+		sentAt: string;
+	};
 };
 
 export type Member = {
 	userId: string;
 	role: 'admin' | 'regular';
+	joinedAt: string;
 };
 
 export async function getChats(): Promise<Chat[]> {
@@ -83,8 +88,13 @@ export async function removeMember(chatId: string, userId: string) {
 	}
 }
 
-export async function createChat(type: Chat['type'], memberIds: string[], title?: string): Promise<Chat> {
-	const res = await authFetch('/api/chats', 'POST', { type, title, memberIds });
+export async function createChat(
+	type: Chat['type'],
+	memberIds: string[],
+	title?: string,
+	clientRequestId?: string,
+): Promise<Chat> {
+	const res = await authFetch('/api/chats', 'POST', { type, title, memberIds, clientRequestId });
 	if (!res.ok) {
 		throw new Error(res.status === 404 ? 'Пользователь не найден' : 'Не удалось создать чат');
 	}

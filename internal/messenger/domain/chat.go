@@ -29,6 +29,7 @@ type ChatActivity struct {
 	LastMessageID       int64
 	LastMessageSenderID uuid.UUID
 	LastMessagePreview  string
+	LastMessageSentAt   time.Time
 }
 
 type Role string

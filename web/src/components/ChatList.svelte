@@ -26,7 +26,7 @@
 
 		for (const chat of fresh) {
 			const before = chats.find((known) => known.id === chat.id);
-			if (chat.lastSeqnum > (before?.lastSeqnum ?? 0)) {
+			if (chat.lastMessage && chat.lastMessage.id !== before?.lastMessage?.id) {
 				unread.add(chat.id);
 			}
 		}
@@ -46,8 +46,12 @@
 				return;
 			}
 
-			chat.lastSeqnum = event.seqnum;
-			chat.lastMessageAt = event.sentAt;
+			chat.lastMessage = {
+				id: event.messageId,
+				senderId: event.senderId,
+				preview: event.content.text,
+				sentAt: event.sentAt,
+			};
 			chats = [chat, ...chats.filter((other) => other !== chat)];
 		});
 	});
@@ -69,7 +73,7 @@
 			id={chat.id}
 			title={chat.title ?? ''}
 			subtitle={chat.type === 'group' ? 'Группа' : 'Личный чат'}
-			meta={formatDay(chat.lastMessageAt)}
+			meta={chat.lastMessage ? formatDay(chat.lastMessage.sentAt) : ''}
 			unread={unread.has(chat.id)}
 		/>
 	{:else}

@@ -1,16 +1,14 @@
 import { auth, refresh } from './auth.svelte.js';
 import { showAlert } from './alert.svelte.js';
 import { pingInterval, reconnectDelay } from '../config/connection.js';
-import type { Message } from './messages.js';
+import type { Message, Sent } from './messages.js';
 
 export type ServerEvent =
-	| ({ method: 'receiveMessage' } & Message)
+	| ({ method: 'receiveMessage'; messageId: string } & Omit<Message, 'id'>)
 	| { method: 'authorizeResponse'; success: boolean }
-	| { method: 'sendMessageResponse'; clientMessageId: string; success: boolean; seqnum?: number; sentAt?: string }
+	| { method: 'sendMessageResponse'; clientMessageId: string; success: boolean; messageId?: string; sentAt?: string }
 	| { method: 'requireAuthorize' }
 	| { method: 'error' };
-
-type Sent = { seqnum: number; sentAt: string };
 
 export const connection = $state<{ status: 'connecting' | 'online' | 'offline' }>({ status: 'connecting' });
 
@@ -116,8 +114,8 @@ function handle(event: ServerEvent) {
 		case 'sendMessageResponse': {
 			const request = pending.get(event.clientMessageId);
 			pending.delete(event.clientMessageId);
-			if (event.success && event.seqnum && event.sentAt) {
-				request?.resolve({ seqnum: event.seqnum, sentAt: event.sentAt });
+			if (event.success && event.messageId && event.sentAt) {
+				request?.resolve({ id: event.messageId, sentAt: event.sentAt });
 			} else {
 				request?.reject(new Error('Не удалось отправить сообщение'));
 			}

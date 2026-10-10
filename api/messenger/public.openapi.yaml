@@ -644,10 +644,14 @@ components:
         preview:
           description: "Начало текста сообщения."
           type: string
+        sentAt:
+          type: string
+          format: "date-time"
       required:
         - id
         - senderId
         - preview
+        - sentAt
 
     ChatCreate:
       type: object

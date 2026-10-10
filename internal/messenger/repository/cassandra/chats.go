@@ -6,6 +6,7 @@ import (
 	"errors"
 	"quaztz/internal/messenger/domain"
 	"quaztz/internal/messenger/repository/cassandra/db"
+	"quaztz/internal/platform/snowflake"
 	"slices"
 
 	"github.com/gocql/gocql"
@@ -95,6 +96,7 @@ func (r *Messenger) GetChatActivity(ctx context.Context, chatID int64) (domain.C
 		LastMessageID:       row.LastMessageId,
 		LastMessageSenderID: row.LastMessageSenderId,
 		LastMessagePreview:  row.LastMessagePreview,
+		LastMessageSentAt:   snowflake.Time(row.LastMessageId),
 	}, nil
 }
 
@@ -212,6 +214,10 @@ func (r *Messenger) DeletePrivateChat(ctx context.Context, chat domain.Chat) err
 }
 
 func (r *Messenger) CreateUserChats(ctx context.Context, chatID int64, members []domain.Member) error {
+	if len(members) == 0 {
+		return nil
+	}
+
 	batch := r.session.ContextBatch(ctx, gocql.UnloggedBatch)
 	query := insertUserChat.Query(r.session)
 	for _, member := range members {
@@ -228,6 +234,10 @@ func (r *Messenger) CreateUserChats(ctx context.Context, chatID int64, members [
 }
 
 func (r *Messenger) DeleteUserChats(ctx context.Context, chatID int64, userIDs []uuid.UUID) error {
+	if len(userIDs) == 0 {
+		return nil
+	}
+
 	batch := r.session.ContextBatch(ctx, gocql.UnloggedBatch)
 	query := deleteUserChat.Query(r.session)
 	for _, userID := range userIDs {
