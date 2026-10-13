@@ -32,11 +32,13 @@ func (r *Idempotency) ChatID(ctx context.Context, userID, clientRequestID uuid.U
 }
 
 func (r *Idempotency) reserve(ctx context.Context, key string, id int64) (int64, error) {
+	// записать новый ID или получить существующий
 	old, err := r.rdb.SetArgs(ctx, key, id, redis.SetArgs{
 		Mode: "NX",
 		Get:  true,
 		TTL:  r.ttl,
 	}).Result()
+
 	if errors.Is(err, redis.Nil) {
 		return id, nil
 	}

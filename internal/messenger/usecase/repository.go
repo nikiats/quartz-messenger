@@ -42,11 +42,7 @@ type UserRepository interface {
 
 type SessionRepository interface {
 	CreateSession(ctx context.Context, session domain.Session, refreshTokenHash string) error
-	RefreshSession(
-		ctx context.Context,
-		session domain.Session,
-		oldRefreshTokenHash, newRefreshTokenHash string,
-	) error
+	RefreshSession(ctx context.Context, session domain.Session, oldHash, newHash string) error
 	RevokeSession(ctx context.Context, userID, sessionID uuid.UUID) error
 }
 

@@ -282,7 +282,7 @@
 
 1. Сформировать хеш пароля `passwordHash` (argon2id).
 2. Сформировать UUID пользователя `userId`.
-3. В одной транзакции PostgreSQL выполнить вставку `(login, userId)` в `user_logins` и вставку в `users`. Конфликт по `login` => завершение.
+3. Выполнить вставку в PostgreSQL `users`. Конфликт по `login` => завершение.
 4. Вернуть `userId`.
 
 ### 15. Поиск пользователей
@@ -323,10 +323,7 @@
 
 **Алгоритм:**
 
-1. В одной транзакции PostgreSQL:
-   - выполнить выборку в `users` по `userId` с блокировкой (FOR UPDATE), получить старый `oldUsername`;
-   - `username` != `oldUsername` => выполнить вставку `(username, userId)` в `usernames` (конфликт => завершение) и удаление `oldUsername` из `usernames`;
-   - выполнить обновление в `users` по `userId`.
+1. Выполнить обновление в PostgreSQL `users` по `userId`. Конфликт по `username` => завершение.
 2. Проиндексировать пользователя в OpenSearch.
 
 ### 18. Создание сессии
@@ -342,7 +339,7 @@
 
 **Алгоритм:**
 
-1. Выполнить выборку в PostgreSQL `user_logins` по `login`, затем в `users` по найденному `user_id`. Пользователь не найден или заблокирован => завершение.
+1. Выполнить выборку в PostgreSQL `users` по `login`. Пользователь не найден или заблокирован => завершение.
 2. Проверить `password` по `password_hash`. Не совпадает => завершение.
 3. Сформировать UUID сессии `sessionId`, случайный `secret` и `refreshToken` = `"{userId}.{sessionId}.{secret}"`.
 4. Выполнить вставку в PostgreSQL `sessions` с хешем `secret` и `expires_at`.

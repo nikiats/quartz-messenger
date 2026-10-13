@@ -14,51 +14,53 @@ type Sessions struct {
 }
 
 func NewSessions(pool *pgxpool.Pool) *Sessions {
-	return &Sessions{
-		q: db.New(pool),
-	}
+	return &Sessions{q: db.New(pool)}
 }
 
 func (r *Sessions) CreateSession(ctx context.Context, session domain.Session, refreshTokenHash string) error {
-	return r.q.CreateSession(ctx, db.CreateSessionParams{
+	params := db.CreateSessionParams{
 		ID:               session.SessionID,
 		UserID:           session.UserID,
 		RefreshTokenHash: refreshTokenHash,
 		ExpiresAt:        session.ExpiresAt,
-	})
+	}
+
+	return r.q.CreateSession(ctx, params)
 }
 
-func (r *Sessions) RefreshSession(
-	ctx context.Context,
-	session domain.Session,
-	oldRefreshTokenHash, newRefreshTokenHash string,
-) error {
-	affected, err := r.q.RefreshSession(ctx, db.RefreshSessionParams{
+func (r *Sessions) RefreshSession(ctx context.Context, session domain.Session, oldHash, newHash string) error {
+	params := db.RefreshSessionParams{
 		UserID:              session.UserID,
 		ID:                  session.SessionID,
-		RefreshTokenHash:    oldRefreshTokenHash,
-		NewRefreshTokenHash: newRefreshTokenHash,
+		RefreshTokenHash:    oldHash,
+		NewRefreshTokenHash: newHash,
 		ExpiresAt:           session.ExpiresAt,
-	})
+	}
+
+	changed, err := r.q.RefreshSession(ctx, params)
 	if err != nil {
 		return err
 	}
-	if affected == 0 {
+	if changed == 0 {
 		return domain.ErrTokenInvalid
 	}
+
 	return nil
 }
 
 func (r *Sessions) RevokeSession(ctx context.Context, userID, sessionID uuid.UUID) error {
-	affected, err := r.q.RevokeSession(ctx, db.RevokeSessionParams{
+	params := db.RevokeSessionParams{
 		UserID: userID,
 		ID:     sessionID,
-	})
+	}
+
+	changed, err := r.q.RevokeSession(ctx, params)
 	if err != nil {
 		return err
 	}
-	if affected == 0 {
+	if changed == 0 {
 		return domain.ErrSessionNotFound
 	}
+
 	return nil
 }

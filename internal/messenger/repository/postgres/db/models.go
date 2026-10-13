@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Session struct {
@@ -16,7 +17,7 @@ type Session struct {
 	RefreshTokenHash string
 	ExpiresAt        time.Time
 	CreatedAt        time.Time
-	RevokedAt        *time.Time
+	RevokedAt        pgtype.Timestamptz
 }
 
 type User struct {
@@ -27,14 +28,4 @@ type User struct {
 	VisibleName  string
 	Suspended    bool
 	CreatedAt    time.Time
-}
-
-type UserLogin struct {
-	Login  string
-	UserID uuid.UUID
-}
-
-type Username struct {
-	Username string
-	UserID   uuid.UUID
 }
