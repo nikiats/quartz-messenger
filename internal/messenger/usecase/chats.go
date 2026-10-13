@@ -5,8 +5,8 @@ import (
 	"context"
 	"errors"
 	"math/rand/v2"
+	"quaztz/internal/common/snowflake"
 	"quaztz/internal/messenger/domain"
-	"quaztz/internal/platform/snowflake"
 	"slices"
 	"time"
 

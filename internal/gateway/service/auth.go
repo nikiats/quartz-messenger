@@ -8,8 +8,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 
-	"quaztz/internal/platform/rediskey"
-	"quaztz/internal/platform/token"
+	"quaztz/internal/common/rediskey"
+	"quaztz/internal/common/token"
 )
 
 var (

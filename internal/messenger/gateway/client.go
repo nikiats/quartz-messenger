@@ -10,8 +10,8 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"quaztz/internal/api/bus"
+	"quaztz/internal/common/rediskey"
 	"quaztz/internal/messenger/domain"
-	"quaztz/internal/platform/rediskey"
 )
 
 type Client struct {

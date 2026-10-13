@@ -3,9 +3,9 @@ package cassandra
 import (
 	"context"
 	"errors"
+	"quaztz/internal/common/snowflake"
 	"quaztz/internal/messenger/domain"
 	"quaztz/internal/messenger/repository/cassandra/db"
-	"quaztz/internal/platform/snowflake"
 
 	"github.com/gocql/gocql"
 	"github.com/scylladb/gocqlx/v3/qb"

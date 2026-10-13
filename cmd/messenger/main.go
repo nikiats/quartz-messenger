@@ -7,6 +7,9 @@ import (
 	"os"
 	"time"
 
+	loader "quaztz/internal/common/config"
+	"quaztz/internal/common/snowflake"
+	"quaztz/internal/common/token"
 	"quaztz/internal/messenger/config"
 	"quaztz/internal/messenger/gateway"
 	"quaztz/internal/messenger/repository/cassandra"
@@ -15,9 +18,6 @@ import (
 	public "quaztz/internal/messenger/transport/http"
 	natstransport "quaztz/internal/messenger/transport/nats"
 	"quaztz/internal/messenger/usecase"
-	loader "quaztz/internal/platform/config"
-	"quaztz/internal/platform/snowflake"
-	"quaztz/internal/platform/token"
 
 	"github.com/alexedwards/argon2id"
 	"github.com/nats-io/nats.go"

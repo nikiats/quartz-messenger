@@ -4,9 +4,9 @@ import (
 	"cmp"
 	"context"
 	"errors"
+	"quaztz/internal/common/snowflake"
 	"quaztz/internal/messenger/domain"
 	"quaztz/internal/messenger/repository/cassandra/db"
-	"quaztz/internal/platform/snowflake"
 	"slices"
 
 	"github.com/gocql/gocql"

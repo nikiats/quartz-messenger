@@ -1,8 +1,8 @@
 package cassandra
 
 import (
+	"quaztz/internal/common/snowflake"
 	"quaztz/internal/messenger/domain"
-	"quaztz/internal/platform/snowflake"
 	"time"
 
 	"github.com/scylladb/gocqlx/v3"

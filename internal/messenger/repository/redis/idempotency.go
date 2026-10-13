@@ -3,7 +3,7 @@ package redis
 import (
 	"context"
 	"errors"
-	"quaztz/internal/platform/rediskey"
+	"quaztz/internal/common/rediskey"
 	"strconv"
 	"time"
 

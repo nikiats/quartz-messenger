@@ -10,14 +10,14 @@ import (
 	"syscall"
 	"time"
 
+	loader "quaztz/internal/common/config"
+	"quaztz/internal/common/rediskey"
+	"quaztz/internal/common/token"
 	"quaztz/internal/gateway/config"
 	"quaztz/internal/gateway/connection"
 	"quaztz/internal/gateway/service"
 	natstransport "quaztz/internal/gateway/transport/nats"
 	"quaztz/internal/gateway/transport/ws"
-	loader "quaztz/internal/platform/config"
-	"quaztz/internal/platform/rediskey"
-	"quaztz/internal/platform/token"
 
 	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
