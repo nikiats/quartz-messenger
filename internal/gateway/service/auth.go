@@ -23,7 +23,6 @@ type Session struct {
 	ExpiresAt time.Time
 }
 
-// валидация сессий на стороне шлюза без обращения к мессенджеру
 type Auth struct {
 	rdb      *redis.Client
 	verifier *token.Verifier

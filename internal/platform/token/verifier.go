@@ -7,7 +7,6 @@ import (
 	"github.com/google/uuid"
 )
 
-// объект для проверки токенов
 type Verifier struct {
 	secret []byte
 }

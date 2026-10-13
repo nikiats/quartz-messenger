@@ -1,14 +1,4 @@
-# Инфраструктура запускается по умолчанию: docker compose up -d
-# Сервисы проекта - профиль app:            docker compose --profile app up -d --build
-# Инструменты (OpenSearch Dashboards, RedisInsight, NUI) - docker compose --profile tools up -d
-#
-# Порты инфраструктуры открыты только на 127.0.0.1 - для запуска сервисов локально.
-
 services:
-  # ============================================================
-  #  Хранилище пользователей
-  # ============================================================
-
   postgres:
     image: postgres:18-alpine
     restart: unless-stopped
@@ -25,10 +15,6 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
-
-  # ============================================================
-  #  Хранилище сообщений
-  # ============================================================
 
   cassandra:
     image: cassandra:5
@@ -48,7 +34,6 @@ services:
       retries: 30
       start_period: 60s
 
-  # одноразовое применение схемы, все CREATE идемпотентны (IF NOT EXISTS)
   cassandra-init:
     image: cassandra:5
     restart: "no"
@@ -73,10 +58,6 @@ services:
     depends_on:
       cassandra:
         condition: service_healthy
-
-  # ============================================================
-  #  In-memory хранилище
-  # ============================================================
 
   redis:
     image: redis:8-alpine
@@ -106,18 +87,13 @@ services:
       redis:
         condition: service_healthy
 
-  # ============================================================
-  #  Pub/sub
-  # ============================================================
-
   nats:
     image: nats:2-alpine
     restart: unless-stopped
-    # -js: JetStream (персистентные потоки), -m: HTTP-мониторинг
     command: ["-js", "-sd", "/data", "-m", "8222"]
     ports:
-      - "127.0.0.1:4222:4222"   # клиенты
-      - "127.0.0.1:8222:8222"   # мониторинг: http://localhost:8222
+      - "127.0.0.1:4222:4222"
+      - "127.0.0.1:8222:8222"
     volumes:
       - nats-data:/data
     healthcheck:
@@ -136,17 +112,12 @@ services:
       nats:
         condition: service_healthy
 
-  # ============================================================
-  #  Поисковый сервис
-  # ============================================================
-
   opensearch:
     image: opensearchproject/opensearch:3
     restart: unless-stopped
     environment:
       discovery.type: single-node
       OPENSEARCH_JAVA_OPTS: -Xms512m -Xmx512m
-      # без TLS и авторизации - только для локальной разработки
       DISABLE_SECURITY_PLUGIN: "true"
       DISABLE_INSTALL_DEMO_CONFIG: "true"
     ulimits:
@@ -175,10 +146,6 @@ services:
     depends_on:
       opensearch:
         condition: service_healthy
-
-  # ============================================================
-  #  Сервисы проекта
-  # ============================================================
 
   messenger:
     profiles: [app]

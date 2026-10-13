@@ -34,20 +34,16 @@ func main() {
 }
 
 func run() error {
-	// загрузка конфигурации
 	var cfg config.Config
 	if err := loader.Load(&cfg, "deploy/gateway.env"); err != nil {
 		return err
 	}
 
-	// ID шлюза
 	gatewayID := uuid.New()
 
-	// graceful stop (1)
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	// соединение с NATS pub/sub системой
 	nc, err := nats.Connect(
 		cfg.NATSUrl,
 		nats.Name("gateway"),
@@ -61,14 +57,12 @@ func run() error {
 	}
 	defer nc.Drain()
 
-	// соединение с Redis
 	rdb := redis.NewClient(&redis.Options{Addr: cfg.RedisAddress})
 	defer rdb.Close()
 	if err := rdb.Ping(ctx).Err(); err != nil {
 		return err
 	}
 
-	// обновление записи об активности шлюза
 	key := rediskey.Gateway(gatewayID)
 	if err := rdb.Set(ctx, key, "1", time.Second*2).Err(); err != nil {
 		return err
@@ -88,21 +82,17 @@ func run() error {
 	}()
 	defer rdb.Del(context.Background(), key)
 
-	// in-memory регистр открытых соединений
 	registry := connection.NewRegistry()
 
-	// сервисы шлюза
 	auth := service.NewAuth(rdb, token.NewVerifier(cfg.JWTSecret))
 	messenger := service.NewMessenger(nc)
 	presence := service.NewPresence(rdb, gatewayID)
 
-	// прием событий мессенджера
 	subscriber := natstransport.NewSubscriber(nc, registry)
 	if err := subscriber.Start(gatewayID); err != nil {
 		return err
 	}
 
-	// запуск WebSocket сервера
 	public := http.NewServeMux()
 	public.Handle("GET /ws", ws.NewHandler(auth, messenger, presence, registry, cfg.OriginPatterns))
 	wsServer := &http.Server{
@@ -124,7 +114,6 @@ func run() error {
 	case <-ctx.Done():
 	}
 
-	// graceful stop (2)
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
 	if err := wsServer.Shutdown(shutdownCtx); err != nil && !errors.Is(err, http.ErrServerClosed) {

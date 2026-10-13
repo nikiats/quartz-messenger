@@ -33,8 +33,6 @@ type Sent struct {
 	SentAt    time.Time
 }
 
-// запросы к мессенджерам через NATS
-// gateway -> любой инстанс сервиса мессенджера
 type Messenger struct {
 	nc *nats.Conn
 }
@@ -44,7 +42,6 @@ func NewMessenger(nc *nats.Conn) *Messenger {
 }
 
 func (m *Messenger) SendMessage(ctx context.Context, message Message) (Sent, error) {
-	// формирование запроса
 	request := bus.SendMessageRequest{
 		ChatID:          message.ChatID,
 		SenderID:        message.SenderID,
@@ -57,7 +54,6 @@ func (m *Messenger) SendMessage(ctx context.Context, message Message) (Sent, err
 		return Sent{}, ErrInternal
 	}
 
-	// отправка в NATS
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
 	msg, err := m.nc.RequestWithContext(ctx, bus.SubjectSendMessage, data)
@@ -65,7 +61,6 @@ func (m *Messenger) SendMessage(ctx context.Context, message Message) (Sent, err
 		return Sent{}, ErrInternal
 	}
 
-	// обработка ошибок
 	switch msg.Header.Get(micro.ErrorCodeHeader) {
 	case "":
 	case bus.CodeForbidden:
@@ -74,7 +69,6 @@ func (m *Messenger) SendMessage(ctx context.Context, message Message) (Sent, err
 		return Sent{}, ErrInternal
 	}
 
-	// разбор ответа
 	var resp bus.SendMessageResponse
 	if err = json.Unmarshal(msg.Data, &resp); err != nil {
 		return Sent{}, ErrInternal

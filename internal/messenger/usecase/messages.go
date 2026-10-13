@@ -37,17 +37,14 @@ func (m *Messages) History(
 	chatID int64,
 	query domain.MessageQuery,
 ) ([]domain.Message, bool, error) {
-	// проверка наличия и неудаленности чата
 	if _, err := activeChat(ctx, m.r, chatID, userID); err != nil {
 		return nil, false, err
 	}
 
-	// TODO: поиск через OpenSearch
 	if query.Search != "" {
 		return nil, false, nil
 	}
 
-	// запрашиваем на одно сообщение больше, чтобы узнать, есть ли еще
 	limit := query.Limit
 	query.Limit = limit + 1
 
@@ -71,12 +68,10 @@ func (m *Messages) Send(
 	clientMessageID uuid.UUID,
 	content domain.MessageContent,
 ) (domain.Message, error) {
-	// проверка наличия и неудаленности чата
 	if _, err := activeChat(ctx, m.r, chatID, senderID); err != nil {
 		return domain.Message{}, err
 	}
 
-	// создаем новый ID, но меняем его на старый, если это повторная отправка
 	newID := m.ids.Generate()
 	messageID, err := m.idempotency.MessageID(ctx, chatID, senderID, clientMessageID, newID)
 	if err != nil {
@@ -91,7 +86,6 @@ func (m *Messages) Send(
 		Content:  content,
 	}
 
-	// при повторе сообщение могло сохраниться в прошлой попытке
 	saved := false
 	if messageID != newID {
 		_, err := m.r.GetMessage(ctx, chatID, messageID)
@@ -109,19 +103,15 @@ func (m *Messages) Send(
 		}
 	}
 
-	// бакет и последнее сообщение чата
 	if err := m.r.UpdateChatActivity(ctx, message); err != nil {
 		return domain.Message{}, err
 	}
-
-	// TODO: индексация в OpenSearch
 
 	go m.deliver(context.WithoutCancel(ctx), message)
 
 	return message, nil
 }
 
-// рассылка сообщения всем участникам чата кроме отправителя
 func (m *Messages) deliver(ctx context.Context, message domain.Message) {
 	members, err := m.r.GetChatMembers(ctx, message.ChatID)
 	if err != nil {
@@ -129,7 +119,6 @@ func (m *Messages) deliver(ctx context.Context, message domain.Message) {
 		return
 	}
 
-	// список получателей
 	recipientIDs := make([]uuid.UUID, 0, len(members))
 	for _, member := range members {
 		if member.UserID != message.SenderID {
@@ -137,7 +126,6 @@ func (m *Messages) deliver(ctx context.Context, message domain.Message) {
 		}
 	}
 
-	// доставка сообщения через шлюз
 	if err := m.gateway.DeliverMessage(ctx, recipientIDs, message); err != nil {
 		slog.Warn("message delivery failed", "chat", message.ChatID, "error", err)
 	}

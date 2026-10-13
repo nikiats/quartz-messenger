@@ -9,7 +9,6 @@ import (
 	"quaztz/internal/platform/rediskey"
 )
 
-// учет подключений пользователей к шлюзу в Redis
 type Presence struct {
 	rdb       *redis.Client
 	gatewayID uuid.UUID

@@ -173,7 +173,6 @@ func (r *Messenger) CreateChatMember(ctx context.Context, chat domain.Chat, memb
 	}).ExecCASRelease())
 }
 
-// admin_id и deleted записываются из chat: так выполняется выход администратора
 func (r *Messenger) DeleteChatMember(ctx context.Context, chat domain.Chat, userID uuid.UUID) error {
 	batch := r.session.ContextBatch(ctx, gocql.LoggedBatch)
 
@@ -193,7 +192,6 @@ func (r *Messenger) DeleteChatMember(ctx context.Context, chat domain.Chat, user
 	return checkVersion(r.execBatchCAS(batch))
 }
 
-// возвращает ID чата 2х человек, идемпотентно
 func (r *Messenger) CreatePrivateChat(ctx context.Context, chat domain.Chat) (int64, error) {
 	row := db.PrivateChatsStruct{
 		UserA:  chat.UserA,

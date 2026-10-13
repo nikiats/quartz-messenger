@@ -13,17 +13,14 @@ import (
 )
 
 const (
-	// запросы
 	methodPing        = "ping"
 	methodAuthorize   = "authorize"
 	methodSendMessage = "sendMessage"
 
-	// ответы
 	methodPong                = "pong"
 	methodAuthorizeResponse   = "authorizeResponse"
 	methodSendMessageResponse = "sendMessageResponse"
 
-	// события
 	methodRequireAuthorize = "requireAuthorize"
 	methodReceiveMessage   = "receiveMessage"
 	methodError            = "error"
@@ -41,7 +38,6 @@ type base struct {
 	Method string `json:"method"`
 }
 
-// схемы запросов
 type pingRequest struct {
 	base
 }
@@ -63,7 +59,6 @@ type sendMessageRequest struct {
 	Content         messageContent `json:"content"`
 }
 
-// схемы ответов
 type errorResponse struct {
 	base
 	Error errorStruct `json:"error"`
@@ -98,7 +93,6 @@ type pongResponse struct {
 	base
 }
 
-// схемы отправляемых сообщений-событий
 type receiveMessage struct {
 	base
 	ChatID    int64          `json:"chatId,string"`
@@ -112,7 +106,6 @@ type requireAuthorize struct {
 	base
 }
 
-// конструкторы сообщений от шлюза
 func newPongResponse() pongResponse {
 	return pongResponse{
 		base: base{Method: methodPong},
@@ -154,7 +147,6 @@ func newReceiveMessage(msg connection.Message) receiveMessage {
 	}
 }
 
-// валидация
 func validateSendMessageRequest(req sendMessageRequest) error {
 	if req.ClientMessageID == uuid.Nil {
 		return errors.New("clientMessageId is required")
@@ -172,7 +164,6 @@ func validateSendMessageRequest(req sendMessageRequest) error {
 	return nil
 }
 
-// разбор запроса и его структурная валидация
 func parseRequest(data []byte) (any, error) {
 	var head base
 	if err := json.Unmarshal(data, &head); err != nil {

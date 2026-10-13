@@ -11,7 +11,6 @@ import (
 	"quaztz/internal/gateway/connection"
 )
 
-// прием событий мессенджера из NATS
 type Subscriber struct {
 	nc       *nats.Conn
 	registry *connection.Registry
@@ -21,7 +20,6 @@ func NewSubscriber(nc *nats.Conn, registry *connection.Registry) *Subscriber {
 	return &Subscriber{nc: nc, registry: registry}
 }
 
-// подписка на рассылку для всех шлюзов и на события этого шлюза
 func (s *Subscriber) Start(gatewayID uuid.UUID) error {
 	_, err := s.nc.Subscribe(bus.SubjectSessionRevoked, s.handleSessionRevoked)
 	if err != nil {

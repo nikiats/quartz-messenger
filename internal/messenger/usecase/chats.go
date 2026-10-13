@@ -104,7 +104,6 @@ func (c *Chats) Create(
 
 func (c *Chats) AddMember(ctx context.Context, userID uuid.UUID, chatID int64, memberID uuid.UUID) error {
 	return retryOnConflict(func() error {
-		// добавлять может только администратор группы
 		chat, err := activeChat(ctx, c.r, chatID, userID)
 		if err != nil {
 			return err
@@ -116,7 +115,6 @@ func (c *Chats) AddMember(ctx context.Context, userID uuid.UUID, chatID int64, m
 			return domain.ErrRequiresAdmin
 		}
 
-		// добавляемый должен существовать и не быть заблокирован
 		active, err := c.users.IsActiveUser(ctx, memberID)
 		if err != nil {
 			return err
@@ -127,7 +125,6 @@ func (c *Chats) AddMember(ctx context.Context, userID uuid.UUID, chatID int64, m
 
 		member := domain.Member{UserID: memberID, JoinedAt: time.Now()}
 
-		// уже участник: user_chats дописывается на случай прошлого сбоя
 		_, err = c.r.GetChat(ctx, chatID, memberID)
 		if err == nil {
 			if err := c.r.CreateUserChats(ctx, chatID, []domain.Member{member}); err != nil {
@@ -151,7 +148,6 @@ func (c *Chats) RemoveMember(ctx context.Context, userID uuid.UUID, chatID int64
 	return retryOnConflict(func() error {
 		chat, err := activeChat(ctx, c.r, chatID, userID)
 
-		// выход мог прерваться после удаления из чата
 		if errors.Is(err, domain.ErrChatNotFound) && memberID == userID {
 			if err := c.r.DeleteUserChats(ctx, chatID, []uuid.UUID{userID}); err != nil {
 				return err
@@ -162,7 +158,6 @@ func (c *Chats) RemoveMember(ctx context.Context, userID uuid.UUID, chatID int64
 			return err
 		}
 
-		// удалять других может только администратор группы
 		if chat.Type != domain.ChatGroup {
 			return domain.ErrRemoveFromPrivateChat
 		}
@@ -171,7 +166,6 @@ func (c *Chats) RemoveMember(ctx context.Context, userID uuid.UUID, chatID int64
 		}
 
 		if memberID == chat.AdminID {
-			// выход администратора: права переходят случайному участнику, без участников чат удаляется
 			members, err := c.r.GetChatMembers(ctx, chatID)
 			if err != nil {
 				return err
@@ -186,7 +180,6 @@ func (c *Chats) RemoveMember(ctx context.Context, userID uuid.UUID, chatID int64
 				chat.AdminID = members[rand.IntN(len(members))].UserID
 			}
 		} else {
-			// удаляемый должен быть участником
 			_, err := c.r.GetChat(ctx, chatID, memberID)
 			if errors.Is(err, domain.ErrChatNotFound) {
 				return domain.ErrMemberNotFound
@@ -207,7 +200,6 @@ func (c *Chats) RemoveMember(ctx context.Context, userID uuid.UUID, chatID int64
 func (c *Chats) Delete(ctx context.Context, userID uuid.UUID, chatID int64) error {
 	var chat domain.Chat
 
-	// удалить группу может только администратор, личный чат - любой участник
 	err := retryOnConflict(func() error {
 		var err error
 		chat, err = c.r.GetChat(ctx, chatID, userID)
@@ -218,7 +210,6 @@ func (c *Chats) Delete(ctx context.Context, userID uuid.UUID, chatID int64) erro
 			return domain.ErrRequiresAdmin
 		}
 
-		// повтор после сбоя: чат уже удален
 		if chat.Deleted {
 			return nil
 		}
@@ -228,14 +219,12 @@ func (c *Chats) Delete(ctx context.Context, userID uuid.UUID, chatID int64) erro
 		return err
 	}
 
-	// пара собеседников освобождается для нового личного чата
 	if chat.Type == domain.ChatPrivate {
 		if err := c.r.DeletePrivateChat(ctx, chat); err != nil {
 			return err
 		}
 	}
 
-	// чат пропадает из списков чатов участников
 	members, err := c.r.GetChatMembers(ctx, chatID)
 	if err != nil {
 		return err
@@ -249,7 +238,6 @@ func (c *Chats) Delete(ctx context.Context, userID uuid.UUID, chatID int64) erro
 }
 
 func (c *Chats) createPrivate(ctx context.Context, userID, peerID uuid.UUID) (int64, bool, error) {
-	// собеседник должен существовать и не быть заблокирован
 	active, err := c.users.IsActiveUser(ctx, peerID)
 	if err != nil {
 		return 0, false, err
@@ -258,7 +246,6 @@ func (c *Chats) createPrivate(ctx context.Context, userID, peerID uuid.UUID) (in
 		return 0, false, domain.ErrUserNotFound
 	}
 
-	// упорядоченная пара не зависит от того, кто создает чат
 	userA, userB := userID, peerID
 	if bytes.Compare(userA[:], userB[:]) > 0 {
 		userA, userB = userB, userA
@@ -273,7 +260,6 @@ func (c *Chats) createPrivate(ctx context.Context, userID, peerID uuid.UUID) (in
 			Version: 1,
 		}
 
-		// пара закрепляется за чатом, если уже занята - возвращается ID существующего
 		chatID, err := c.r.CreatePrivateChat(ctx, chat)
 		if err != nil {
 			return 0, false, err
@@ -282,7 +268,6 @@ func (c *Chats) createPrivate(ctx context.Context, userID, peerID uuid.UUID) (in
 		if chatID != chat.ID {
 			existing, err := c.r.GetChat(ctx, chatID, userID)
 
-			// чат удален: пара освобождается, попытка повторяется
 			if err == nil && existing.Deleted {
 				if err := c.r.DeletePrivateChat(ctx, existing); err != nil {
 					return 0, false, err
@@ -290,7 +275,6 @@ func (c *Chats) createPrivate(ctx context.Context, userID, peerID uuid.UUID) (in
 				continue
 			}
 
-			// чат существует: user_chats дописывается на случай прошлого сбоя
 			if err == nil {
 				return chatID, false, c.r.CreateUserChats(ctx, chatID, privateMembers(existing))
 			}
@@ -298,7 +282,6 @@ func (c *Chats) createPrivate(ctx context.Context, userID, peerID uuid.UUID) (in
 				return 0, false, err
 			}
 
-			// пара занята, но прошлая попытка не успела создать чат
 			chat.ID = chatID
 		}
 
@@ -319,7 +302,6 @@ func (c *Chats) createGroup(
 	memberIDs []uuid.UUID,
 	clientRequestID uuid.UUID,
 ) (int64, bool, error) {
-	// все участники должны существовать и не быть заблокированы
 	count, err := c.users.CountActiveUsers(ctx, memberIDs)
 	if err != nil {
 		return 0, false, err
@@ -328,7 +310,6 @@ func (c *Chats) createGroup(
 		return 0, false, domain.ErrUserNotFound
 	}
 
-	// новый ID или выданный при прошлой попытке
 	chatID, err := c.idempotency.ChatID(ctx, userID, clientRequestID, c.ids.Generate())
 	if err != nil {
 		return 0, false, err
@@ -350,7 +331,6 @@ func (c *Chats) createGroup(
 	err = c.r.CreateChat(ctx, chat, members)
 	created := err == nil
 
-	// чат создан прошлой попыткой, участники могли с тех пор измениться
 	if errors.Is(err, domain.ErrChatExists) {
 		members, err = c.r.GetChatMembers(ctx, chatID)
 	}
@@ -361,7 +341,6 @@ func (c *Chats) createGroup(
 	return chatID, created, c.r.CreateUserChats(ctx, chatID, members)
 }
 
-// названия личных чатов - имена собеседников
 func (c *Chats) setPrivateTitles(ctx context.Context, userID uuid.UUID, chats []domain.Chat) error {
 	var peerIDs []uuid.UUID
 	for _, chat := range chats {
@@ -386,7 +365,6 @@ func (c *Chats) setPrivateTitles(ctx context.Context, userID uuid.UUID, chats []
 	return nil
 }
 
-// чат, в котором пользователь участник и который не удален
 func activeChat(ctx context.Context, r MessengerRepository, chatID int64, userID uuid.UUID) (domain.Chat, error) {
 	chat, err := r.GetChat(ctx, chatID, userID)
 	if err != nil {
@@ -398,7 +376,6 @@ func activeChat(ctx context.Context, r MessengerRepository, chatID int64, userID
 	return chat, nil
 }
 
-// повтор операции, если чат изменили параллельно
 func retryOnConflict(fn func() error) error {
 	var err error
 	for range maxConflictRetries {

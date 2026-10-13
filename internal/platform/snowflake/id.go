@@ -12,19 +12,14 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// время аренды номера узла в Redis
 const nodeTTL = 30 * time.Second
 
-// НИ В КОЕМ СЛУЧАЕ НЕЛЬЗЯ МЕНЯТЬ ДАННОЕ ЗНАЧЕНИЕ
-// ТАК КАК ОНО ЯВЛЯЕТСЯ НАЧАЛОМ ЭПОХИ ДЛЯ СОЗДАНИЯ SNOWFLAKE ID
 var epochStart = time.Date(2026, 1, 1, 1, 0, 0, 0, time.UTC)
 
 func init() {
 	snowflake.Epoch = epochStart.UnixMilli()
 }
 
-// скрипты Redis
-// продление аренды, только если ключ все еще принадлежит этому инстансу
 var renewScript = redis.NewScript(`
 if redis.call("GET", KEYS[1]) == ARGV[1] then
 	return redis.call("PEXPIRE", KEYS[1], ARGV[2])
@@ -32,7 +27,6 @@ end
 return 0
 `)
 
-// освобождение номера, только если ключ все еще принадлежит этому инстансу
 var releaseScript = redis.NewScript(`
 if redis.call("GET", KEYS[1]) == ARGV[1] then
 	return redis.call("DEL", KEYS[1])
@@ -51,7 +45,6 @@ type Snowflake struct {
 	errs  chan error
 }
 
-// занимает свободный номер узла в Redis и продлевает аренду до Close
 func New(ctx context.Context, rdb *redis.Client) (*Snowflake, error) {
 	owner := uuid.NewString()
 
@@ -92,7 +85,6 @@ func (s *Snowflake) Generate() int64 {
 	return s.node.Generate().Int64()
 }
 
-// канал для передачи ошибок обновления захвата ID
 func (s *Snowflake) Err() <-chan error {
 	return s.errs
 }
@@ -102,34 +94,28 @@ func (s *Snowflake) Close() error {
 	return releaseScript.Run(context.Background(), s.rdb, []string{s.key}, s.owner).Err()
 }
 
-// продление активности ноды в Redis раз в 1/3 времени TTL
 func (s *Snowflake) renew() {
 	interval := nodeTTL / 3
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
 	for {
-		// остановка либо ожидание следующего тика
 		select {
 		case <-s.stop:
 			return
 		case <-ticker.C:
 		}
 
-		// продление
 		ctx, cancel := context.WithTimeout(context.Background(), interval)
 		renewed, err := renewScript.Run(ctx, s.rdb, []string{s.key}, s.owner, nodeTTL.Milliseconds()).Int()
 		cancel()
 
 		switch {
 		case err == nil && renewed == 1:
-			// обновлено время
 		case err == nil:
-			// захват ID потерян
 			s.errs <- ErrNodeLost
 			return
 		default:
-			// есть ошибка err != nil
 			s.errs <- errors.Join(ErrNodeLost, err)
 			slog.Warn("snowflake node renew failed", "error", err)
 			return

@@ -23,7 +23,6 @@ const (
 	deliveryQueue   = 256
 )
 
-// объект для управления жизненным циклом соединения пользователя со шлюзом
 type clientSession struct {
 	wsConn    *websocket.Conn
 	auth      *service.Auth
@@ -37,12 +36,10 @@ type clientSession struct {
 	askReauthTimer *time.Timer
 	expireTimer    *time.Timer
 
-	// сообщения для доставки пишутся в сокет отдельной горутиной
 	deliveries chan connection.Message
 	overflowed atomic.Bool
 }
 
-// getters и helpers
 func (s *clientSession) UserID() uuid.UUID {
 	return s.userID
 }
@@ -68,7 +65,6 @@ func (s *clientSession) stopTimers() {
 	}
 }
 
-// установка таймера сессии и запроса на повторную авторизацию
 func (s *clientSession) setupSessionExpiry(expiresAt time.Time) {
 	s.stopTimers()
 
@@ -85,7 +81,6 @@ func (s *clientSession) setupSessionExpiry(expiresAt time.Time) {
 	})
 }
 
-// отправка произвольной структуры в сериализации JSON
 func (s *clientSession) send(ctx context.Context, responseStruct any) error {
 	data, err := json.Marshal(responseStruct)
 	if err != nil {
@@ -98,8 +93,6 @@ func (s *clientSession) send(ctx context.Context, responseStruct any) error {
 	return s.wsConn.Write(ctx, websocket.MessageText, data)
 }
 
-// функции для вызова при получении событий из NATS
-// не блокирует: клиент, не успевающий читать, отключается и после переподключения догружает пропущенное
 func (s *clientSession) Deliver(message connection.Message) {
 	select {
 	case s.deliveries <- message:
@@ -127,14 +120,12 @@ func (s *clientSession) Close(reason string) {
 	_ = s.wsConn.Close(websocket.StatusPolicyViolation, reason)
 }
 
-// удаление из регистра и, если соединение последнее, из Redis
 func (s *clientSession) unregister() {
 	if s.registry.Remove(s) {
 		_ = s.presence.Unregister(context.Background(), s.userID)
 	}
 }
 
-// полный цикл работы с WebSocket соединением пользователя
 func (s *clientSession) run(ctx context.Context) {
 	defer s.unregister()
 	defer s.stopTimers()
@@ -196,7 +187,6 @@ func (s *clientSession) handle(ctx context.Context, data []byte) error {
 	}
 }
 
-// обработчики разобранных и валидированных запросов
 func (s *clientSession) handlePing(ctx context.Context, _ pingRequest) error {
 	return s.send(ctx, newPongResponse())
 }
@@ -204,7 +194,6 @@ func (s *clientSession) handlePing(ctx context.Context, _ pingRequest) error {
 func (s *clientSession) handleAuthorize(ctx context.Context, req authorizeRequest) error {
 	resp := newAuthorizeResponse(false)
 
-	// проверка токена и не была ли отозвана сессия
 	session, err := s.auth.ValidateSession(ctx, req.Token)
 	if err != nil {
 		switch {
@@ -220,7 +209,6 @@ func (s *clientSession) handleAuthorize(ctx context.Context, req authorizeReques
 		return s.send(ctx, resp)
 	}
 
-	// повторная авторизация допускается только для той же сессии
 	if s.isAuthorized() && !s.hasSession(session) {
 		resp.Error = &errorStruct{
 			Message: "session mismatch",
@@ -230,12 +218,10 @@ func (s *clientSession) handleAuthorize(ctx context.Context, req authorizeReques
 		return s.send(ctx, resp)
 	}
 
-	// добавление в реестр
 	s.sessionID = session.SessionID
 	s.userID = session.UserID
 	s.registry.Add(s)
 
-	// проверка, не был ли токен отозван
 	revoked, err := s.auth.IsRevoked(ctx, s.sessionID)
 	if err != nil {
 		resp.Error = ErrorStructInternal
@@ -253,14 +239,12 @@ func (s *clientSession) handleAuthorize(ctx context.Context, req authorizeReques
 		return s.send(ctx, resp)
 	}
 
-	// запись о подключении пользователя к шлюзу, повторяется при каждой авторизации
 	if err := s.presence.Register(ctx, s.userID); err != nil {
 		resp.Error = ErrorStructInternal
 		defer s.Close("authorization error")
 		return s.send(ctx, resp)
 	}
 
-	// финальные действия при добавлении сессии
 	s.setupSessionExpiry(session.ExpiresAt)
 	resp.Success = true
 	return s.send(ctx, resp)

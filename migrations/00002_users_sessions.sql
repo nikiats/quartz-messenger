@@ -1,21 +1,14 @@
 -- +goose Up
--- чаты и сообщения перенесены в Cassandra
 DROP TABLE messages;
 DROP TABLE chat_members;
 DROP TABLE chats;
 DROP TYPE chat_type;
 
--- ============================================================
---  Уникальные индексы пользователей
--- ============================================================
-
--- уникальность логина
 CREATE TABLE user_logins (
     login   CITEXT PRIMARY KEY,
     user_id UUID   NOT NULL
 );
 
--- уникальность юзернейма
 CREATE TABLE usernames (
     username CITEXT PRIMARY KEY,
     user_id  UUID   NOT NULL
@@ -31,11 +24,6 @@ ALTER TABLE users
     DROP CONSTRAINT users_login_key,
     DROP CONSTRAINT users_username_key;
 
--- ============================================================
---  Сессии
--- ============================================================
-
--- сессии распределяются вместе с пользователем
 ALTER TABLE sessions
     DROP CONSTRAINT sessions_pkey,
     DROP CONSTRAINT sessions_refresh_token_hash_key,

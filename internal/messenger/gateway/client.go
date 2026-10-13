@@ -14,7 +14,6 @@ import (
 	"quaztz/internal/platform/rediskey"
 )
 
-// события для шлюзов через NATS и общее с ними состояние в Redis
 type Client struct {
 	nc         *nats.Conn
 	rdb        *redis.Client
@@ -25,22 +24,17 @@ func NewClient(nc *nats.Conn, rdb *redis.Client, revokedTTL time.Duration) *Clie
 	return &Client{nc: nc, rdb: rdb, revokedTTL: revokedTTL}
 }
 
-// отправка сообщения на все шлюзы с получателями
 func (c *Client) DeliverMessage(ctx context.Context, recipientIDs []uuid.UUID, message domain.Message) error {
 	pipe := c.rdb.Pipeline()
 
-	// кол-во шлюзов <= количеству получателей (худший случай - каждый получатель на своем шлюзе)
 	cmds := make([]*redis.StringSliceCmd, len(recipientIDs))
 	for i, userID := range recipientIDs {
-		// команда на получение всех шлюзов на которых сидит получатель
 		cmds[i] = pipe.SMembers(ctx, rediskey.Conn(userID))
 	}
-	// пакетное выполнение запроса
 	if _, err := pipe.Exec(ctx); err != nil {
 		return err
 	}
 
-	// для каждого шлюза список его пользователей, которым доставить сообщение
 	byGateway := map[string][]uuid.UUID{}
 	for i, cmd := range cmds {
 		for _, gatewayID := range cmd.Val() {
@@ -48,8 +42,6 @@ func (c *Client) DeliverMessage(ctx context.Context, recipientIDs []uuid.UUID, m
 		}
 	}
 
-	// каждому рассылаем сообщение + список получателей
-	// шлюз не имеет информацию о том, кто есть в каком чате
 	for gatewayID, userIDs := range byGateway {
 		id, err := uuid.Parse(gatewayID)
 		if err != nil {
@@ -76,7 +68,6 @@ func (c *Client) DeliverMessage(ctx context.Context, recipientIDs []uuid.UUID, m
 	return nil
 }
 
-// запись об отзыве сессии + рассылка события отзыва всем шлюзам
 func (c *Client) InvalidateSession(ctx context.Context, sessionID uuid.UUID) error {
 	if err := c.rdb.Set(ctx, rediskey.Revoked(sessionID), "1", c.revokedTTL).Err(); err != nil {
 		return err
@@ -90,7 +81,6 @@ func (c *Client) InvalidateSession(ctx context.Context, sessionID uuid.UUID) err
 	return c.nc.Publish(bus.SubjectSessionRevoked, data)
 }
 
-// проверка отзыва сессии, нужна для каждого запроса с авторизацией
 func (c *Client) IsRevoked(ctx context.Context, sessionID uuid.UUID) (bool, error) {
 	n, err := c.rdb.Exists(ctx, rediskey.Revoked(sessionID)).Result()
 	if err != nil {

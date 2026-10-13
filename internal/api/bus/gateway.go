@@ -6,7 +6,6 @@ import (
 	"github.com/google/uuid"
 )
 
-// SubjectGatewayMessage
 type MessageEvent struct {
 	ChatID       int64          `json:"chatId,string"`
 	MessageID    int64          `json:"messageId,string"`
@@ -16,7 +15,6 @@ type MessageEvent struct {
 	RecipientIDs []uuid.UUID    `json:"recipientIds"`
 }
 
-// SubjectSessionRevoked
 type SessionRevokedEvent struct {
 	SessionID uuid.UUID `json:"sessionId"`
 }

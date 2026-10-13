@@ -10,7 +10,6 @@ type MessageContent struct {
 	Text string `json:"text"`
 }
 
-// SubjectSendMessage
 type SendMessageRequest struct {
 	ChatID          int64          `json:"chatId,string"`
 	SenderID        uuid.UUID      `json:"senderId"`

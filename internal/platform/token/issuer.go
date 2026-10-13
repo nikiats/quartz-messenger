@@ -5,7 +5,6 @@ import (
 	"github.com/google/uuid"
 )
 
-// объект для выпуска токенов
 type Issuer struct {
 	secret []byte
 }

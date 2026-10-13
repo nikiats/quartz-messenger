@@ -39,26 +39,22 @@ func run() error {
 
 	ctx := context.Background()
 
-	// создание пула соединений с БД
 	pool, err := postgres.NewPool(ctx, cfg.PostgresURL)
 	if err != nil {
 		return err
 	}
 	defer pool.Close()
 
-	// автоматическая миграция
 	if err := postgres.Migrate(ctx, pool); err != nil {
 		return err
 	}
 
-	// соединение с Cassandra
 	session, err := cassandra.NewSession(cfg.Cassandra.Hosts, cfg.Cassandra.Keyspace, cfg.Cassandra.DisableHostLookup)
 	if err != nil {
 		return err
 	}
 	defer session.Close()
 
-	// соединение с NATS pub/sub системой
 	nc, err := nats.Connect(
 		cfg.NATSUrl,
 		nats.Name("messenger"),
@@ -72,30 +68,25 @@ func run() error {
 	}
 	defer nc.Drain()
 
-	// соединение с Redis
 	rdb := redis.NewClient(&redis.Options{Addr: cfg.RedisAddr})
 	defer rdb.Close()
 	if err := rdb.Ping(ctx).Err(); err != nil {
 		return err
 	}
 
-	// генератор Snowflake ID, номер узла арендуется в Redis
 	ids, err := snowflake.New(ctx, rdb)
 	if err != nil {
 		return err
 	}
 	defer ids.Close()
 
-	// клиент к gateway service
 	gatewayClient := gateway.NewClient(nc, rdb, cfg.AccessTTL)
 
-	// создание сущностей слоя repository
 	messengerRepository := cassandra.NewMessenger(session)
 	userRepository := postgres.NewUsers(pool)
 	sessionRepository := postgres.NewSessions(pool)
 	idempotencyRepository := redisrepository.NewIdempotency(rdb, cfg.IdempotencyTTL)
 
-	// usecase: управление сессиями
 	sessions := usecase.NewSessions(
 		sessionRepository,
 		userRepository,
@@ -105,7 +96,6 @@ func run() error {
 		cfg.AccessTTL,
 		cfg.RefreshTTL,
 	)
-	// usecase: работа с пользователями, чатами, сообщениями
 	passwordParams := argon2id.Params(cfg.Argon2)
 	users := usecase.NewUsers(userRepository, &passwordParams)
 	chats := usecase.NewChats(messengerRepository, userRepository, idempotencyRepository, ids)
@@ -113,7 +103,6 @@ func run() error {
 
 	errs := make(chan error, 1)
 
-	// запуск публичного API
 	publicApiServer := &http.Server{
 		Addr:              cfg.PublicAddr,
 		Handler:           public.NewHandler(chats, users, messages, sessions, sessions),
@@ -123,7 +112,6 @@ func run() error {
 		errs <- publicApiServer.ListenAndServe()
 	}()
 
-	// прием запросов шлюзов
 	if err := natstransport.NewServer(nc, messages, sessions).Start(); err != nil {
 		return err
 	}

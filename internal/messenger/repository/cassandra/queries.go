@@ -6,7 +6,6 @@ import (
 	"github.com/scylladb/gocqlx/v3/qb"
 )
 
-// сообщения
 var (
 	getMessage = db.Messages.GetBuilder()
 
@@ -35,7 +34,6 @@ var (
 	upsertChatActivity = db.ChatActivity.InsertBuilder()
 )
 
-// чаты и участники
 var (
 	getChat        = db.ChatMembers.GetBuilder()
 	getChatMembers = db.ChatMembers.SelectBuilder("user_id", "joined_at", "admin_id")
@@ -55,7 +53,6 @@ var (
 	deletePrivateChat = db.PrivateChats.DeleteBuilder().If(qb.Eq("chat_id"))
 )
 
-// чаты пользователя
 var (
 	getUserChats   = db.UserChats.SelectBuilder("chat_id")
 	insertUserChat = db.UserChats.InsertBuilder()

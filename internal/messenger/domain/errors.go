@@ -2,7 +2,6 @@ package domain
 
 import "errors"
 
-// ошибки сессий и авторизации
 var (
 	ErrTokenExpired       = errors.New("token expired")
 	ErrTokenInvalid       = errors.New("token is invalid")
@@ -12,20 +11,17 @@ var (
 	ErrInvalidCredentials = errors.New("invalid login or password")
 )
 
-// ошибки отправки сообщения
 var (
 	ErrChatNotFound    = errors.New("chat not found")
 	ErrMessageNotFound = errors.New("message not found")
 )
 
-// ошибки пользователей
 var (
 	ErrUserNotFound  = errors.New("user not found")
 	ErrLoginTaken    = errors.New("login already taken")
 	ErrUsernameTaken = errors.New("username already taken")
 )
 
-// ошибки при работе с чатами
 var (
 	ErrMemberExists          = errors.New("member already exists")
 	ErrMemberNotFound        = errors.New("member not found")

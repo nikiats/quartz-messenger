@@ -11,7 +11,6 @@ gen:
 sqlc:
 	sqlc generate -f internal/messenger/repository/postgres/sqlc.yaml
 
-# запускается в сети docker: адрес контейнера Cassandra недоступен с хоста
 cqlgen:
 	docker run --rm --network quaztz_default -v "$(CURDIR)":/src -v quaztz-gomod:/go/pkg/mod -w /src golang:1.26-alpine \
 		go tool schemagen -cluster=cassandra -keyspace=quaztz -output=internal/messenger/repository/cassandra/db -pkgname=db
@@ -34,7 +33,6 @@ migrate-create:
 web-dev:
 	cd web && npm run dev
 
-# инфраструктура без сервисов проекта
 infra-up:
 	docker compose up -d
 

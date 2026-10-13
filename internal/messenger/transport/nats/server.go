@@ -12,10 +12,8 @@ import (
 	"quaztz/internal/messenger/domain"
 )
 
-// одновременно обрабатываемых запросов на отправку
 const maxConcurrentSends = 1024
 
-// обработка запросов шлюзов через NATS request-reply
 type Server struct {
 	nc    *nats.Conn
 	m     Messages
@@ -27,7 +25,6 @@ func NewServer(nc *nats.Conn, m Messages, s Sessions) *Server {
 	return &Server{nc: nc, m: m, s: s, sends: make(chan struct{}, maxConcurrentSends)}
 }
 
-// регистрация сервиса в queue group мессенджеров
 func (s *Server) Start() error {
 	srv, err := micro.AddService(s.nc, micro.Config{
 		Name:       "messenger",
@@ -45,7 +42,6 @@ func (s *Server) Start() error {
 	)
 }
 
-// NATS вызывает обработчик последовательно, поэтому каждый запрос уходит в свою горутину
 func (s *Server) handleSendMessage(r micro.Request) {
 	s.sends <- struct{}{}
 	go func() {

@@ -31,7 +31,6 @@ func (r *Idempotency) ChatID(ctx context.Context, userID, clientRequestID uuid.U
 	return r.reserve(ctx, rediskey.Chat(userID, clientRequestID), chatID)
 }
 
-// захватить ID, и вернуть новый при успехе либо существующий, если уже захвачен
 func (r *Idempotency) reserve(ctx context.Context, key string, id int64) (int64, error) {
 	old, err := r.rdb.SetArgs(ctx, key, id, redis.SetArgs{
 		Mode: "NX",

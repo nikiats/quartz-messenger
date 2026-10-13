@@ -93,7 +93,6 @@ func (r *Messenger) UpdateChatActivity(ctx context.Context, message domain.Messa
 		return err
 	}
 
-	// метка времени записи - время сообщения: более старое не перезапишет новое
 	return upsertChatActivity.QueryContext(ctx, r.session).BindStruct(db.ChatActivityStruct{
 		ChatId:              message.ChatID,
 		LastMessageId:       message.ID,
