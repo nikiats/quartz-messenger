@@ -6,24 +6,20 @@ import (
 	"github.com/google/uuid"
 )
 
-func Revoked(sessionID uuid.UUID) string {
-	return "revoked:" + sessionID.String()
+func RevokedSession(sessionID uuid.UUID) string {
+	return "revoked_session:" + sessionID.String()
 }
 
-func Conn(userID uuid.UUID) string {
-	return "conn:" + userID.String()
+func Connection(userID uuid.UUID) string {
+	return "connection:" + userID.String()
 }
 
-func Gateway(gatewayID uuid.UUID) string {
-	return "gateway:" + gatewayID.String()
-}
-
-func SnowflakeNode(nodeNum int64) string {
-	return "sfnode:" + strconv.FormatInt(nodeNum, 10)
+func SnowflakeInstance(nodeNum int64) string {
+	return "snowflake_instance:" + strconv.FormatInt(nodeNum, 10)
 }
 
 func Message(chatID int64, senderID, clientMessageID uuid.UUID) string {
-	return "msg:" + strconv.FormatInt(chatID, 10) + ":" + senderID.String() + ":" + clientMessageID.String()
+	return "message:" + strconv.FormatInt(chatID, 10) + ":" + senderID.String() + ":" + clientMessageID.String()
 }
 
 func Chat(userID, clientRequestID uuid.UUID) string {

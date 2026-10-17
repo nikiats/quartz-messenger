@@ -7,6 +7,7 @@ import (
 	"os"
 	"time"
 
+	"quartz/internal/common/auth"
 	loader "quartz/internal/common/config"
 	"quartz/internal/common/snowflake"
 	"quartz/internal/common/token"
@@ -87,12 +88,15 @@ func run() error {
 	sessionRepository := postgres.NewSessions(pool)
 	idempotencyRepository := redisrepository.NewIdempotency(rdb, cfg.IdempotencyTTL)
 
+	verifier := token.NewVerifier(cfg.JWTSecret)
+
 	sessions := usecase.NewSessions(
 		sessionRepository,
 		userRepository,
 		gatewayClient,
+		auth.NewAuthentication(rdb, verifier),
 		token.NewIssuer(cfg.JWTSecret),
-		token.NewVerifier(cfg.JWTSecret),
+		verifier,
 		cfg.AccessTTL,
 		cfg.RefreshTTL,
 	)

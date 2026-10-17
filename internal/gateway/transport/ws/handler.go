@@ -5,31 +5,29 @@ import (
 
 	"github.com/coder/websocket"
 
-	"quartz/internal/gateway/connection"
-	"quartz/internal/gateway/service"
+	"quartz/internal/common/auth"
+	"quartz/internal/gateway/messenger"
+	"quartz/internal/gateway/usecase"
 )
 
 type Handler struct {
-	auth           *service.Auth
-	messenger      *service.Messenger
-	presence       *service.Presence
-	registry       *connection.Registry
+	auth           *auth.Authentication
+	messenger      *messenger.Client
+	hub            *usecase.Hub
 	originPatterns []string
 }
 
 func NewHandler(
-	a *service.Auth,
-	m *service.Messenger,
-	p *service.Presence,
-	r *connection.Registry,
-	originPattern []string,
+	authentication *auth.Authentication,
+	messengerClient *messenger.Client,
+	hub *usecase.Hub,
+	originPatterns []string,
 ) *Handler {
 	return &Handler{
-		auth:           a,
-		messenger:      m,
-		presence:       p,
-		registry:       r,
-		originPatterns: originPattern,
+		auth:           authentication,
+		messenger:      messengerClient,
+		hub:            hub,
+		originPatterns: originPatterns,
 	}
 }
 
@@ -43,14 +41,13 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	conn.SetReadLimit(readLimit)
 
-	connSession := &clientSession{
-		wsConn:     conn,
-		auth:       h.auth,
-		messenger:  h.messenger,
-		presence:   h.presence,
-		registry:   h.registry,
-		deliveries: make(chan connection.Message, deliveryQueue),
+	session := &clientSession{
+		conn:      conn,
+		auth:      h.auth,
+		messenger: h.messenger,
+		hub:       h.hub,
+		outbox:    make(chan []byte, outboxSize),
 	}
 
-	connSession.run(r.Context())
+	session.run(r.Context())
 }

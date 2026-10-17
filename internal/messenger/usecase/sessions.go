@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"quartz/internal/common/auth"
 	"quartz/internal/common/token"
 	"quartz/internal/messenger/domain"
 	"time"
@@ -14,31 +15,34 @@ import (
 )
 
 type Sessions struct {
-	r          SessionRepository
-	users      UserRepository
-	gateway    Gateway
-	issuer     *token.Issuer
-	verifier   *token.Verifier
-	accessTTL  time.Duration
-	refreshTTL time.Duration
+	r             SessionRepository
+	users         UserRepository
+	gateway       Gateway
+	authenticator Authenticator
+	issuer        *token.Issuer
+	verifier      *token.Verifier
+	accessTTL     time.Duration
+	refreshTTL    time.Duration
 }
 
 func NewSessions(
 	r SessionRepository,
 	users UserRepository,
 	gateway Gateway,
+	authenticator Authenticator,
 	issuer *token.Issuer,
 	verifier *token.Verifier,
 	accessTTL, refreshTTL time.Duration,
 ) *Sessions {
 	return &Sessions{
-		r:          r,
-		users:      users,
-		gateway:    gateway,
-		issuer:     issuer,
-		verifier:   verifier,
-		accessTTL:  accessTTL,
-		refreshTTL: refreshTTL,
+		r:             r,
+		users:         users,
+		gateway:       gateway,
+		authenticator: authenticator,
+		issuer:        issuer,
+		verifier:      verifier,
+		accessTTL:     accessTTL,
+		refreshTTL:    refreshTTL,
 	}
 }
 
@@ -114,21 +118,24 @@ func (s *Sessions) Revoke(ctx context.Context, userID, sessionID uuid.UUID) erro
 }
 
 func (s *Sessions) Authenticate(ctx context.Context, accessToken string) (domain.Session, error) {
-	session, err := s.parse(accessToken, token.Access)
-	if err != nil {
+	claims, err := s.authenticator.AuthenticateToken(ctx, accessToken)
+
+	switch {
+	case errors.Is(err, token.ErrExpired):
+		return domain.Session{}, domain.ErrTokenExpired
+	case errors.Is(err, token.ErrInvalid):
+		return domain.Session{}, domain.ErrTokenInvalid
+	case errors.Is(err, auth.ErrRevoked):
+		return domain.Session{}, domain.ErrSessionRevoked
+	case err != nil:
 		return domain.Session{}, err
 	}
 
-	err = s.CheckRevoked(ctx, session.SessionID)
-	if err != nil {
-		return domain.Session{}, err
-	}
-
-	return session, nil
+	return sessionFromClaims(claims), nil
 }
 
 func (s *Sessions) CheckRevoked(ctx context.Context, sessionID uuid.UUID) error {
-	revoked, err := s.gateway.IsRevoked(ctx, sessionID)
+	revoked, err := s.authenticator.CheckRevoked(ctx, sessionID)
 	if err != nil {
 		return err
 	}
@@ -174,11 +181,15 @@ func (s *Sessions) parse(raw, tokenType string) (domain.Session, error) {
 		return domain.Session{}, domain.ErrTokenInvalid
 	}
 
+	return sessionFromClaims(claims), nil
+}
+
+func sessionFromClaims(claims token.Claims) domain.Session {
 	return domain.Session{
 		UserID:    claims.UserID,
 		SessionID: claims.SessionID,
 		ExpiresAt: claims.ExpiresAt,
-	}, nil
+	}
 }
 
 func hashToken(token string) string {

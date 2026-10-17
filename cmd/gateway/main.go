@@ -10,18 +10,20 @@ import (
 	"syscall"
 	"time"
 
-	loader "quartz/internal/common/config"
-	"quartz/internal/common/rediskey"
-	"quartz/internal/common/token"
-	"quartz/internal/gateway/config"
-	"quartz/internal/gateway/connection"
-	"quartz/internal/gateway/service"
-	natstransport "quartz/internal/gateway/transport/nats"
-	"quartz/internal/gateway/transport/ws"
-
 	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
 	"github.com/redis/go-redis/v9"
+
+	"quartz/internal/common/auth"
+	loader "quartz/internal/common/config"
+	"quartz/internal/common/token"
+	"quartz/internal/gateway/config"
+	"quartz/internal/gateway/messenger"
+	"quartz/internal/gateway/presence"
+	"quartz/internal/gateway/registry"
+	natstransport "quartz/internal/gateway/transport/nats"
+	"quartz/internal/gateway/transport/ws"
+	"quartz/internal/gateway/usecase"
 )
 
 const shutdownTimeout = 10 * time.Second
@@ -63,38 +65,16 @@ func run() error {
 		return err
 	}
 
-	key := rediskey.Gateway(gatewayID)
-	if err := rdb.Set(ctx, key, "1", time.Second*2).Err(); err != nil {
-		return err
-	}
-	ticker := time.NewTicker(time.Second)
-	go func() {
-		for {
-			select {
-			case <-ticker.C:
-				if err := rdb.Set(ctx, key, "1", time.Second*2).Err(); err != nil {
-					slog.Warn("gateway heartbeat failed", "error", err)
-				}
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-	defer rdb.Del(context.Background(), key)
+	hub := usecase.NewHub(registry.New(), presence.New(rdb, gatewayID))
+	authentication := auth.NewAuthentication(rdb, token.NewVerifier(cfg.JWTSecret))
+	messengerClient := messenger.NewClient(nc)
 
-	registry := connection.NewRegistry()
-
-	auth := service.NewAuth(rdb, token.NewVerifier(cfg.JWTSecret))
-	messenger := service.NewMessenger(nc)
-	presence := service.NewPresence(rdb, gatewayID)
-
-	subscriber := natstransport.NewSubscriber(nc, registry)
-	if err := subscriber.Start(gatewayID); err != nil {
+	if err := natstransport.NewSubscriber(nc, hub).Start(gatewayID); err != nil {
 		return err
 	}
 
 	public := http.NewServeMux()
-	public.Handle("GET /ws", ws.NewHandler(auth, messenger, presence, registry, cfg.OriginPatterns))
+	public.Handle("GET /ws", ws.NewHandler(authentication, messengerClient, hub, cfg.OriginPatterns))
 	wsServer := &http.Server{
 		Addr:              cfg.WSAddress,
 		Handler:           public,
@@ -106,7 +86,7 @@ func run() error {
 		errs <- wsServer.ListenAndServe()
 	}()
 
-	slog.Info("gateway started", "ws", cfg.WSAddress)
+	slog.Info("gateway started", "id", gatewayID, "ws", cfg.WSAddress)
 
 	select {
 	case err := <-errs:
@@ -116,9 +96,11 @@ func run() error {
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
+
 	if err := wsServer.Shutdown(shutdownCtx); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}
+	hub.CloseAll(shutdownCtx)
 
 	slog.Info("gateway stopped gracefully")
 	return nil

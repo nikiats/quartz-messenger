@@ -8,9 +8,9 @@ import (
 	"unicode/utf8"
 
 	"github.com/google/uuid"
-
-	"quartz/internal/gateway/connection"
 )
+
+const maxContentRunes = 1000
 
 const (
 	methodPing        = "ping"
@@ -22,7 +22,6 @@ const (
 	methodSendMessageResponse = "sendMessageResponse"
 
 	methodRequireAuthorize = "requireAuthorize"
-	methodReceiveMessage   = "receiveMessage"
 	methodError            = "error"
 )
 
@@ -44,7 +43,6 @@ type pingRequest struct {
 
 type authorizeRequest struct {
 	base
-
 	Token string `json:"token"`
 }
 
@@ -59,19 +57,18 @@ type sendMessageRequest struct {
 	Content         messageContent `json:"content"`
 }
 
-type errorResponse struct {
-	base
-	Error errorStruct `json:"error"`
-}
-
 type errorStruct struct {
 	Message string `json:"message"`
 	Code    string `json:"code"`
 }
 
-var ErrorStructInternal = &errorStruct{
-	Message: "internal error",
-	Code:    codeInternal,
+type errorResponse struct {
+	base
+	Error errorStruct `json:"error"`
+}
+
+type pongResponse struct {
+	base
 }
 
 type authorizeResponse struct {
@@ -89,79 +86,8 @@ type sendMessageResponse struct {
 	SentAt          time.Time    `json:"sentAt,omitzero"`
 }
 
-type pongResponse struct {
-	base
-}
-
-type receiveMessage struct {
-	base
-	ChatID    int64          `json:"chatId,string"`
-	MessageID int64          `json:"messageId,string"`
-	SenderID  uuid.UUID      `json:"senderId"`
-	SentAt    time.Time      `json:"sentAt"`
-	Content   messageContent `json:"content"`
-}
-
 type requireAuthorize struct {
 	base
-}
-
-func newPongResponse() pongResponse {
-	return pongResponse{
-		base: base{Method: methodPong},
-	}
-}
-
-func newErrorResponse(code, err string) errorResponse {
-	return errorResponse{
-		base:  base{methodError},
-		Error: errorStruct{Code: code, Message: err},
-	}
-}
-
-func newAuthorizeResponse(success bool) authorizeResponse {
-	return authorizeResponse{
-		base:    base{methodAuthorizeResponse},
-		Success: success,
-		Error:   nil,
-	}
-}
-
-func newSendMessageResponse(clientMessageID uuid.UUID) sendMessageResponse {
-	return sendMessageResponse{
-		base:            base{methodSendMessageResponse},
-		ClientMessageID: clientMessageID,
-	}
-}
-
-func newReceiveMessage(msg connection.Message) receiveMessage {
-	return receiveMessage{
-		base:      base{methodReceiveMessage},
-		ChatID:    msg.ChatID,
-		MessageID: msg.ID,
-		SenderID:  msg.SenderID,
-		SentAt:    msg.SentAt,
-		Content: messageContent{
-			Text: msg.Content,
-		},
-	}
-}
-
-func validateSendMessageRequest(req sendMessageRequest) error {
-	if req.ClientMessageID == uuid.Nil {
-		return errors.New("clientMessageId is required")
-	}
-
-	if req.ChatID == 0 {
-		return errors.New("chatId is required")
-	}
-
-	n := utf8.RuneCountInString(req.Content.Text)
-	if n < 1 || n > maxContentRunes {
-		return errors.New("content.text length must be [1; 1000] UTF characters")
-	}
-
-	return nil
 }
 
 func parseRequest(data []byte) (any, error) {
@@ -176,21 +102,38 @@ func parseRequest(data []byte) (any, error) {
 	case methodAuthorize:
 		return decode[authorizeRequest](data)
 	case methodSendMessage:
-		req, err := decode[sendMessageRequest](data)
+		request, err := decode[sendMessageRequest](data)
 		if err != nil {
 			return nil, err
 		}
-		return req, validateSendMessageRequest(req.(sendMessageRequest))
+		return request, validateSendMessageRequest(request)
 	default:
 		return nil, errors.New("method not allowed")
 	}
 }
 
-func decode[T any](data []byte) (any, error) {
-	var req T
-	if err := json.Unmarshal(data, &req); err != nil {
-		return nil, fmt.Errorf("message parse failed: %w", err)
+func decode[T any](data []byte) (T, error) {
+	var request T
+	if err := json.Unmarshal(data, &request); err != nil {
+		return request, fmt.Errorf("message parse failed: %w", err)
 	}
 
-	return req, nil
+	return request, nil
+}
+
+func validateSendMessageRequest(request sendMessageRequest) error {
+	if request.ClientMessageID == uuid.Nil {
+		return errors.New("clientMessageId is required")
+	}
+
+	if request.ChatID == 0 {
+		return errors.New("chatId is required")
+	}
+
+	n := utf8.RuneCountInString(request.Content.Text)
+	if n < 1 || n > maxContentRunes {
+		return fmt.Errorf("content.text length must be [1; %d] UTF characters", maxContentRunes)
+	}
+
+	return nil
 }

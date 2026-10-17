@@ -49,9 +49,9 @@ func New(ctx context.Context, rdb *redis.Client) (*Snowflake, error) {
 	owner := uuid.NewString()
 
 	for nodeID := range int64(1) << snowflake.NodeBits {
-		key := rediskey.SnowflakeNode(nodeID)
+		instanceKey := rediskey.SnowflakeInstance(nodeID)
 
-		taken, err := rdb.SetNX(ctx, key, owner, nodeTTL).Result()
+		taken, err := rdb.SetNX(ctx, instanceKey, owner, nodeTTL).Result()
 		if err != nil {
 			return nil, err
 		}
@@ -67,7 +67,7 @@ func New(ctx context.Context, rdb *redis.Client) (*Snowflake, error) {
 		s := &Snowflake{
 			node:  node,
 			rdb:   rdb,
-			key:   key,
+			key:   instanceKey,
 			owner: owner,
 			stop:  make(chan struct{}),
 			errs:  make(chan error, 1),

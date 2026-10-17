@@ -21,6 +21,7 @@ var (
 type Claims struct {
 	UserID    uuid.UUID
 	SessionID uuid.UUID
+
 	ExpiresAt time.Time
 }
 

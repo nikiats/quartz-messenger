@@ -10,5 +10,4 @@ import (
 type Gateway interface {
 	DeliverMessage(ctx context.Context, recipientIDs []uuid.UUID, message domain.Message) error
 	InvalidateSession(ctx context.Context, sessionID uuid.UUID) error
-	IsRevoked(ctx context.Context, sessionID uuid.UUID) (bool, error)
 }
