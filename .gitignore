@@ -15,6 +15,7 @@ go.work
 go.work.sum
 
 *.env
+docker-compose.override.yml
 
 deploy/nginx.conf
 

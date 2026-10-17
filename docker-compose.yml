@@ -2,11 +2,12 @@ name: quartz
 
 services:
   postgres:
+    container_name: qm_postgres
     image: postgres:18-alpine
     restart: unless-stopped
     environment:
       POSTGRES_USER: quartz
-      POSTGRES_PASSWORD: quartz
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-quartz}
       POSTGRES_DB: quartz
     ports:
       - "127.0.0.1:5432:5432"
@@ -19,6 +20,7 @@ services:
       retries: 10
 
   cassandra:
+    container_name: qm_cassandra
     image: cassandra:5
     restart: unless-stopped
     environment:
@@ -37,6 +39,7 @@ services:
       start_period: 60s
 
   cassandra-init:
+    container_name: qm_cassandra_init
     image: cassandra:5
     restart: "no"
     entrypoint: ["cqlsh", "cassandra", "-f", "/schema/schema.cql"]
@@ -47,6 +50,7 @@ services:
         condition: service_healthy
 
   cassandra-web:
+    container_name: qm_cassandra_web
     image: ipushc/cassandra-web:latest
     restart: unless-stopped
     environment:
@@ -62,6 +66,7 @@ services:
         condition: service_healthy
 
   redis:
+    container_name: qm_redis
     image: redis:8-alpine
     restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes"]
@@ -76,6 +81,7 @@ services:
       retries: 10
 
   redisinsight:
+    container_name: qm_redisinsight
     image: redis/redisinsight:latest
     profiles: [tools]
     restart: unless-stopped
@@ -90,6 +96,7 @@ services:
         condition: service_healthy
 
   nats:
+    container_name: qm_nats
     image: nats:2-alpine
     restart: unless-stopped
     command: ["-js", "-sd", "/data", "-m", "8222"]
@@ -105,6 +112,7 @@ services:
       retries: 10
 
   nui:
+    container_name: qm_nui
     image: ghcr.io/nats-nui/nui:latest
     profiles: [tools]
     restart: unless-stopped
@@ -115,6 +123,7 @@ services:
         condition: service_healthy
 
   opensearch:
+    container_name: qm_opensearch
     image: opensearchproject/opensearch:3
     restart: unless-stopped
     environment:
@@ -137,6 +146,7 @@ services:
       start_period: 30s
 
   opensearch-dashboards:
+    container_name: qm_opensearch_dashboards
     image: opensearchproject/opensearch-dashboards:3
     profiles: [tools]
     restart: unless-stopped
@@ -150,6 +160,7 @@ services:
         condition: service_healthy
 
   messenger:
+    container_name: qm_messenger
     profiles: [app]
     build:
       context: .
@@ -159,19 +170,19 @@ services:
     restart: unless-stopped
     environment:
       PUBLIC_HTTP_ADDR: ":8080"
-      POSTGRES_URL: postgres://quartz:quartz@postgres:5432/quartz?sslmode=disable
+      POSTGRES_URL: postgres://quartz:${POSTGRES_PASSWORD:-quartz}@postgres:5432/quartz?sslmode=disable
       CASSANDRA_HOSTS: cassandra:9042
       CASSANDRA_KEYSPACE: quartz_messenger
       REDIS_ADDR: redis:6379
-      IDEMPOTENCY_TTL: 24h
+      IDEMPOTENCY_TTL: ${IDEMPOTENCY_TTL:-24h}
       NATS_URL: nats://nats:4222
       OPENSEARCH_URL: http://opensearch:9200
-      JWT_SECRET: change-me
-      ACCESS_TTL: 15m
-      REFRESH_TTL: 168h
-      ARGON2_MEMORY: 8
-      ARGON2_ITERATIONS: 1
-      ARGON2_PARALLELISM: 1
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env}
+      ACCESS_TTL: ${ACCESS_TTL:-15m}
+      REFRESH_TTL: ${REFRESH_TTL:-168h}
+      ARGON2_MEMORY: ${ARGON2_MEMORY:-19456}
+      ARGON2_ITERATIONS: ${ARGON2_ITERATIONS:-2}
+      ARGON2_PARALLELISM: ${ARGON2_PARALLELISM:-1}
       ARGON2_SALT_LENGTH: 16
       ARGON2_KEY_LENGTH: 32
     depends_on:
@@ -187,6 +198,7 @@ services:
         condition: service_healthy
 
   gateway:
+    container_name: qm_gateway
     profiles: [app]
     build:
       context: .
@@ -198,8 +210,8 @@ services:
       WS_ADDR: ":9080"
       REDIS_ADDR: redis:6379
       NATS_URL: nats://nats:4222
-      JWT_SECRET: change-me
-      ORIGIN_PATTERNS: localhost
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env}
+      ORIGIN_PATTERNS: ${ORIGIN_PATTERNS:-localhost}
     depends_on:
       redis:
         condition: service_healthy
@@ -207,6 +219,7 @@ services:
         condition: service_healthy
 
   web:
+    container_name: qm_web
     profiles: [app]
     build:
       context: .
