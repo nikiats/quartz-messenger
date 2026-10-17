@@ -6,7 +6,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 
-	"quaztz/internal/common/rediskey"
+	"quartz/internal/common/rediskey"
 )
 
 type Presence struct {

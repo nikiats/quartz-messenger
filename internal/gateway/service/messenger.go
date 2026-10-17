@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"quaztz/internal/api/bus"
+	"quartz/internal/api/bus"
 	"time"
 
 	"github.com/google/uuid"

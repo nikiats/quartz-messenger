@@ -2,7 +2,7 @@ package usecase
 
 import (
 	"context"
-	"quaztz/internal/messenger/domain"
+	"quartz/internal/messenger/domain"
 
 	"github.com/google/uuid"
 )

@@ -10,8 +10,7 @@ expires_at = @expires_at
 WHERE
 user_id = @user_id
 AND sessions.id = @id
--- хэш меняется вместе с refresh токеном при каждом обновлении
-AND refresh_token_hash = @refresh_token_hash 
+AND refresh_token_hash = @refresh_token_hash
 AND revoked_at IS NULL
 AND expires_at > now()
 AND EXISTS (SELECT 1 FROM users u WHERE u.id = @user_id AND NOT u.suspended);

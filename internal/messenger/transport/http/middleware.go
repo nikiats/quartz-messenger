@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	api "quaztz/internal/api/messagepublic"
-	"quaztz/internal/messenger/domain"
+	api "quartz/internal/api/messagepublic"
+	"quartz/internal/messenger/domain"
 	"strings"
 )
 

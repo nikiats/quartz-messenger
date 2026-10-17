@@ -9,9 +9,9 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/redis/go-redis/v9"
 
-	"quaztz/internal/api/bus"
-	"quaztz/internal/common/rediskey"
-	"quaztz/internal/messenger/domain"
+	"quartz/internal/api/bus"
+	"quartz/internal/common/rediskey"
+	"quartz/internal/messenger/domain"
 )
 
 type Client struct {

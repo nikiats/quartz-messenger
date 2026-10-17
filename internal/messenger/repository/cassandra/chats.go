@@ -5,9 +5,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"quaztz/internal/common/snowflake"
-	"quaztz/internal/messenger/domain"
-	"quaztz/internal/messenger/repository/cassandra/db"
+	"quartz/internal/common/snowflake"
+	"quartz/internal/messenger/domain"
+	"quartz/internal/messenger/repository/cassandra/db"
 	"slices"
 
 	"github.com/gocql/gocql"
@@ -88,12 +88,10 @@ func (r *Messenger) GetChats(ctx context.Context, userID uuid.UUID) ([]domain.Ch
 		return nil, err
 	}
 
-	// пропуски в слайсе: пользователь уже не в чате или чат удален
 	chats = slices.DeleteFunc(chats, func(chat domain.Chat) bool {
 		return chat.ID == 0
 	})
 
-	// сортировка по убыванию времени последнего сообщения, для чата без сообщений - времени создания
 	slices.SortFunc(chats, func(a, b domain.Chat) int {
 		activityA := a.ID
 		if a.Activity.ID != 0 {
@@ -149,7 +147,6 @@ func (r *Messenger) GetChatMembers(ctx context.Context, chatID int64) ([]domain.
 
 	members := make([]domain.Member, 0, len(rows))
 	for _, row := range rows {
-		// если нет участников, будут static колонки, а в остальных полях вернет NULL
 		if row.UserId == uuid.Nil {
 			continue
 		}
@@ -287,7 +284,6 @@ func (r *Messenger) CreatePrivateChat(ctx context.Context, chat domain.Chat) (in
 		ChatId: chat.ID,
 	}
 
-	// при неудаче в row записывается существующая запись
 	applied, err := insertPrivateChat.query(ctx, r.session).BindStruct(
 		row,
 	).GetCASRelease(&row)
@@ -299,7 +295,6 @@ func (r *Messenger) CreatePrivateChat(ctx context.Context, chat domain.Chat) (in
 }
 
 func (r *Messenger) DeletePrivateChat(ctx context.Context, chat domain.Chat) error {
-	// неудача означает, что пара уже указывает на другой чат и запись трогать не нужно
 	_, err := deletePrivateChat.query(ctx, r.session).BindStruct(
 		db.PrivateChatsStruct{
 			UserA:  chat.UserA,

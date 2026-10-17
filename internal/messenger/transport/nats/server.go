@@ -8,8 +8,8 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/micro"
 
-	"quaztz/internal/api/bus"
-	"quaztz/internal/messenger/domain"
+	"quartz/internal/api/bus"
+	"quartz/internal/messenger/domain"
 )
 
 const maxConcurrentSends = 1024

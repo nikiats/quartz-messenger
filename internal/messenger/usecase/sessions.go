@@ -5,8 +5,8 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
-	"quaztz/internal/common/token"
-	"quaztz/internal/messenger/domain"
+	"quartz/internal/common/token"
+	"quartz/internal/messenger/domain"
 	"time"
 
 	"github.com/alexedwards/argon2id"

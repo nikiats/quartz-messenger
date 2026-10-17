@@ -5,8 +5,8 @@ import (
 
 	"github.com/coder/websocket"
 
-	"quaztz/internal/gateway/connection"
-	"quaztz/internal/gateway/service"
+	"quartz/internal/gateway/connection"
+	"quartz/internal/gateway/service"
 )
 
 type Handler struct {

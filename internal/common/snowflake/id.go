@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
-	"quaztz/internal/common/rediskey"
+	"quartz/internal/common/rediskey"
 	"time"
 
 	"github.com/bwmarrin/snowflake"

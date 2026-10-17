@@ -3,7 +3,7 @@ package http
 import (
 	"errors"
 	"fmt"
-	api "quaztz/internal/api/messagepublic"
+	api "quartz/internal/api/messagepublic"
 	"unicode/utf8"
 
 	"github.com/google/uuid"

@@ -5,7 +5,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"quaztz/internal/messenger/domain"
+	"quartz/internal/messenger/domain"
 )
 
 type Sessions interface {

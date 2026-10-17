@@ -39,7 +39,7 @@
 	<div class="welcome">
 		<div class="brand">
 			<span class="mark">q</span>
-			<h1>quaztz</h1>
+			<h1>quartz</h1>
 			<p>Безопасный быстрый мессенджер.</p>
 		</div>
 		<div class="actions">

@@ -1,17 +1,19 @@
+name: quartz
+
 services:
   postgres:
     image: postgres:18-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: quaztz
-      POSTGRES_PASSWORD: quaztz
-      POSTGRES_DB: quaztz
+      POSTGRES_USER: quartz
+      POSTGRES_PASSWORD: quartz
+      POSTGRES_DB: quartz
     ports:
       - "127.0.0.1:5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U quaztz -d quaztz"]
+      test: ["CMD-SHELL", "pg_isready -U quartz -d quartz"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -20,7 +22,7 @@ services:
     image: cassandra:5
     restart: unless-stopped
     environment:
-      CASSANDRA_CLUSTER_NAME: quaztz
+      CASSANDRA_CLUSTER_NAME: quartz
       MAX_HEAP_SIZE: 1G
       HEAP_NEWSIZE: 200M
     ports:
@@ -80,7 +82,7 @@ services:
     environment:
       RI_REDIS_HOST: redis
       RI_REDIS_PORT: 6379
-      RI_REDIS_ALIAS: quaztz
+      RI_REDIS_ALIAS: quartz
     ports:
       - "127.0.0.1:5540:5540"
     depends_on:
@@ -157,9 +159,9 @@ services:
     restart: unless-stopped
     environment:
       PUBLIC_HTTP_ADDR: ":8080"
-      POSTGRES_URL: postgres://quaztz:quaztz@postgres:5432/quaztz?sslmode=disable
+      POSTGRES_URL: postgres://quartz:quartz@postgres:5432/quartz?sslmode=disable
       CASSANDRA_HOSTS: cassandra:9042
-      CASSANDRA_KEYSPACE: quaztz
+      CASSANDRA_KEYSPACE: quartz_messenger
       REDIS_ADDR: redis:6379
       IDEMPOTENCY_TTL: 24h
       NATS_URL: nats://nats:4222

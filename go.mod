@@ -1,4 +1,4 @@
-module quaztz
+module quartz
 
 go 1.26.1
 

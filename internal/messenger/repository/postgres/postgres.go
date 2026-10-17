@@ -1,10 +1,12 @@
 package postgres
 
+//go:generate sqlc generate
+
 import (
 	"context"
 	"fmt"
 	"log/slog"
-	"quaztz/migrations"
+	"quartz/migrations"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"

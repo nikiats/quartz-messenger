@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"quaztz/internal/common/snowflake"
-	"quaztz/internal/messenger/domain"
-	"quaztz/internal/messenger/repository/cassandra/db"
+	"quartz/internal/common/snowflake"
+	"quartz/internal/messenger/domain"
+	"quartz/internal/messenger/repository/cassandra/db"
 
 	"github.com/gocql/gocql"
 	"github.com/scylladb/gocqlx/v3/qb"

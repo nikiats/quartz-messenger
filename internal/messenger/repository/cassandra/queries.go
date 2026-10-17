@@ -2,7 +2,7 @@ package cassandra
 
 import (
 	"context"
-	"quaztz/internal/messenger/repository/cassandra/db"
+	"quartz/internal/messenger/repository/cassandra/db"
 
 	"github.com/scylladb/gocqlx/v3"
 	"github.com/scylladb/gocqlx/v3/qb"

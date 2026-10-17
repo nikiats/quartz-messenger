@@ -7,8 +7,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
 
-	"quaztz/internal/api/bus"
-	"quaztz/internal/gateway/connection"
+	"quartz/internal/api/bus"
+	"quartz/internal/gateway/connection"
 )
 
 type Subscriber struct {

@@ -10,8 +10,8 @@ import (
 	"github.com/coder/websocket"
 	"github.com/google/uuid"
 
-	"quaztz/internal/gateway/connection"
-	"quaztz/internal/gateway/service"
+	"quartz/internal/gateway/connection"
+	"quartz/internal/gateway/service"
 )
 
 const (

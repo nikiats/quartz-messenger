@@ -9,7 +9,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"quaztz/internal/gateway/connection"
+	"quartz/internal/gateway/connection"
 )
 
 const (

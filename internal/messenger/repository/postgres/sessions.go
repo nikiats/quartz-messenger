@@ -2,8 +2,8 @@ package postgres
 
 import (
 	"context"
-	"quaztz/internal/messenger/domain"
-	"quaztz/internal/messenger/repository/postgres/db"
+	"quartz/internal/messenger/domain"
+	"quartz/internal/messenger/repository/postgres/db"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"

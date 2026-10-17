@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"log/slog"
-	"quaztz/internal/common/snowflake"
-	"quaztz/internal/messenger/domain"
+	"quartz/internal/common/snowflake"
+	"quartz/internal/messenger/domain"
 
 	"github.com/google/uuid"
 )
