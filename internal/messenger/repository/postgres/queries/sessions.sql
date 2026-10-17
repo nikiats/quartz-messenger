@@ -8,13 +8,12 @@ SET
 refresh_token_hash = @new_refresh_token_hash,
 expires_at = @expires_at
 WHERE
--- выбор действующей сессии для обновления 
 user_id = @user_id
 AND sessions.id = @id
-AND refresh_token_hash = @refresh_token_hash
+-- хэш меняется вместе с refresh токеном при каждом обновлении
+AND refresh_token_hash = @refresh_token_hash 
 AND revoked_at IS NULL
 AND expires_at > now()
--- проверка, что пользователь активен
 AND EXISTS (SELECT 1 FROM users u WHERE u.id = @user_id AND NOT u.suspended);
 
 -- name: RevokeSession :execrows

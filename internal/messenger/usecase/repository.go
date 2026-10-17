@@ -15,14 +15,14 @@ type MessengerRepository interface {
 
 	GetChat(ctx context.Context, chatID int64, userID uuid.UUID) (domain.Chat, error)
 	GetChats(ctx context.Context, userID uuid.UUID) ([]domain.Chat, error)
-	GetChatActivity(ctx context.Context, chatID int64) (domain.ChatActivity, error)
+	GetLastMessage(ctx context.Context, chatID int64) (domain.LastMessage, error)
 	GetChatMembers(ctx context.Context, chatID int64) ([]domain.Member, error)
 	CreateChat(ctx context.Context, chat domain.Chat, members []domain.Member) error
 	DeleteChat(ctx context.Context, chat domain.Chat) error
 	CreateChatMember(ctx context.Context, chat domain.Chat, member domain.Member) error
 	DeleteChatMember(ctx context.Context, chat domain.Chat, userID uuid.UUID) error
 
-	CreatePrivateChat(ctx context.Context, chat domain.Chat) (int64, error)
+	CreatePrivateChat(ctx context.Context, chat domain.Chat) (int64, bool, error)
 	DeletePrivateChat(ctx context.Context, chat domain.Chat) error
 
 	CreateUserChats(ctx context.Context, chatID int64, members []domain.Member) error

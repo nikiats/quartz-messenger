@@ -44,8 +44,8 @@
    - время отправки `sentAt`;
    - номер бакета `bucket`.
 7. Неудача => прочитать сообщение из Cassandra `messages` по `(chatId, bucket, messageId)`.
-8. Успех или сообщение не найдено на шаге 7 => выполнить вставку сообщения в Cassandra `messages` по `(chatId, bucket, messageId)`. Сообщение найдено => пропустить вставку.
-9. Выполнить вставку `(chatId, bucket)` в Cassandra `message_buckets`.
+8. Успех или сообщение не найдено на шаге 7 => выполнить вставку `(chatId, bucket)` в Cassandra `message_buckets`, затем вставку сообщения в Cassandra `messages` по `(chatId, bucket, messageId)`. Сообщение найдено => пропустить вставки.
+9. Бакет вставляется до сообщения, поэтому сохраненное сообщение всегда видно при загрузке истории.
 10. Обновить Cassandra `chat_activity` для `chatId` с меткой времени записи `USING TIMESTAMP`, равной `sentAt`.
 11. Опубликовать в pub/sub событие о новом сообщении в чате `chatId`.
 12. Опубликовать в JetStream событие для асинхронной индексации сообщения в OpenSearch.

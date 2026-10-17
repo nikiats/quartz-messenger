@@ -54,7 +54,7 @@ func (c *Chats) Get(ctx context.Context, userID uuid.UUID, chatID int64) (domain
 		return domain.Chat{}, err
 	}
 
-	chat.Activity, err = c.r.GetChatActivity(ctx, chatID)
+	chat.Activity, err = c.r.GetLastMessage(ctx, chatID)
 	if err != nil {
 		return domain.Chat{}, err
 	}
@@ -260,12 +260,12 @@ func (c *Chats) createPrivate(ctx context.Context, userID, peerID uuid.UUID) (in
 			Version: 1,
 		}
 
-		chatID, err := c.r.CreatePrivateChat(ctx, chat)
+		chatID, created, err := c.r.CreatePrivateChat(ctx, chat)
 		if err != nil {
 			return 0, false, err
 		}
 
-		if chatID != chat.ID {
+		if !created {
 			existing, err := c.r.GetChat(ctx, chatID, userID)
 
 			if err == nil && existing.Deleted {

@@ -18,7 +18,6 @@ WHERE id = ANY($1::uuid[])
 AND NOT suspended
 `
 
-// подсчет для всех переданных ID пользователей
 func (q *Queries) CountActiveUsers(ctx context.Context, ids []uuid.UUID) (int64, error) {
 	row := q.db.QueryRow(ctx, countActiveUsers, ids)
 	var count int64
@@ -142,7 +141,6 @@ type SearchUsersRow struct {
 	VisibleName string
 }
 
-// поиск по началу имени пользователя
 func (q *Queries) SearchUsers(ctx context.Context, arg SearchUsersParams) ([]SearchUsersRow, error) {
 	rows, err := q.db.Query(ctx, searchUsers, arg.Query, arg.RowLimit)
 	if err != nil {
@@ -177,7 +175,6 @@ type UpdateProfileParams struct {
 	ID          uuid.UUID
 }
 
-// COALESCE берет новое значение если не NULL, иначе прошлое
 func (q *Queries) UpdateProfile(ctx context.Context, arg UpdateProfileParams) error {
 	_, err := q.db.Exec(ctx, updateProfile, arg.VisibleName, arg.Username, arg.ID)
 	return err

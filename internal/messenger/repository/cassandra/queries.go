@@ -1,60 +1,124 @@
 package cassandra
 
 import (
+	"context"
 	"quaztz/internal/messenger/repository/cassandra/db"
 
+	"github.com/scylladb/gocqlx/v3"
 	"github.com/scylladb/gocqlx/v3/qb"
 )
 
+// заранее собираемые запросы CQL
+type cqlQuery struct {
+	cql   string
+	names []string
+}
+
+func newQuery(b qb.Builder) cqlQuery {
+	cql, names := b.ToCql()
+	return cqlQuery{
+		cql:   cql,
+		names: names,
+	}
+}
+
+func (s cqlQuery) query(ctx context.Context, session gocqlx.Session) *gocqlx.Queryx {
+	return session.ContextQuery(ctx, s.cql, s.names)
+}
+
 var (
-	getMessage = db.Messages.GetBuilder()
+	insertMessage = newQuery(
+		qb.Insert(
+			db.Messages.Name(),
+		).Columns("chat_id", "bucket", "message_id", "sender_id", "content"),
+	)
+	getMessage = newQuery(
+		db.Messages.GetBuilder(),
+	)
+	getMessagesBefore = newQuery(
+		db.Messages.SelectBuilder().
+			Where(qb.Lt("message_id")).
+			LimitNamed("limit"),
+	)
+	getMessagesAfter = newQuery(
+		db.Messages.SelectBuilder().
+			Where(qb.Gt("message_id")).
+			OrderBy("message_id", qb.ASC).
+			LimitNamed("limit"),
+	)
 
-	insertMessage = qb.Insert(db.Messages.Name()).
-			Columns("chat_id", "bucket", "message_id", "sender_id", "content")
-
-	getMessagesBefore = db.Messages.SelectBuilder().
-				Where(qb.Lt("message_id")).
-				LimitNamed("limit")
-
-	getMessagesAfter = db.Messages.SelectBuilder().
-				Where(qb.Gt("message_id")).
-				OrderBy("message_id", qb.ASC).
-				LimitNamed("limit")
-
-	getBucketsBefore = db.MessageBuckets.SelectBuilder("bucket").
-				Where(qb.LtOrEq("bucket"))
-
-	getBucketsAfter = db.MessageBuckets.SelectBuilder("bucket").
+	insertBucket = newQuery(
+		db.MessageBuckets.InsertBuilder(),
+	)
+	getBucketsBefore = newQuery(
+		db.MessageBuckets.SelectBuilder("bucket").
+			Where(qb.LtOrEq("bucket")),
+	)
+	getBucketsAfter = newQuery(
+		db.MessageBuckets.SelectBuilder("bucket").
 			Where(qb.GtOrEq("bucket")).
-			OrderBy("bucket", qb.ASC)
+			OrderBy("bucket", qb.ASC),
+	)
 
-	insertBucket = db.MessageBuckets.InsertBuilder()
-
-	getChatActivity    = db.ChatActivity.GetBuilder()
-	upsertChatActivity = db.ChatActivity.InsertBuilder()
+	upsertChatActivity = newQuery(
+		db.ChatActivity.InsertBuilder(),
+	)
+	getChatActivity = newQuery(
+		db.ChatActivity.GetBuilder(),
+	)
 )
 
 var (
-	getChat        = db.ChatMembers.GetBuilder()
-	getChatMembers = db.ChatMembers.SelectBuilder("user_id", "joined_at", "admin_id")
-
-	insertChatMember = db.ChatMembers.InsertBuilder().Unique()
-	deleteChatMember = db.ChatMembers.DeleteBuilder()
-
-	addChatMember = db.ChatMembers.UpdateBuilder("joined_at", "version").
-			If(qb.EqNamed("version", "expected_version"))
-
-	updateChat = qb.Update(db.ChatMembers.Name()).
-			Set("admin_id", "deleted", "version").
+	insertChat = newQuery(
+		qb.Update(
+			db.ChatMembers.Name(),
+		).Set("type", "title", "user_a", "user_b", "admin_id", "deleted", "version").
 			Where(qb.Eq("chat_id")).
-			If(qb.EqNamed("version", "expected_version"))
+			If(qb.EqLit("version", "null")),
+	)
+	insertChatMember = newQuery(
+		qb.Insert(
+			db.ChatMembers.Name(),
+		).Columns("chat_id", "user_id", "joined_at"),
+	)
+	getChat = newQuery(
+		db.ChatMembers.GetBuilder(),
+	)
+	getChatMembers = newQuery(
+		db.ChatMembers.SelectBuilder("user_id", "joined_at", "admin_id"),
+	)
+	deleteChatMember = newQuery(
+		db.ChatMembers.DeleteBuilder(),
+	)
+	addChatMember = newQuery(
+		db.ChatMembers.UpdateBuilder("joined_at", "version").
+			If(qb.EqNamed("version", "expected_version")),
+	)
+	updateChat = newQuery(
+		qb.Update(
+			db.ChatMembers.Name(),
+		).Set("admin_id", "deleted", "version").
+			Where(qb.Eq("chat_id")).
+			If(qb.EqNamed("version", "expected_version")),
+	)
 
-	insertPrivateChat = db.PrivateChats.InsertBuilder().Unique()
-	deletePrivateChat = db.PrivateChats.DeleteBuilder().If(qb.Eq("chat_id"))
+	insertPrivateChat = newQuery(
+		db.PrivateChats.InsertBuilder().Unique(),
+	)
+	deletePrivateChat = newQuery(
+		db.PrivateChats.DeleteBuilder().
+			If(qb.Eq("chat_id")),
+	)
 )
 
 var (
-	getUserChats   = db.UserChats.SelectBuilder("chat_id")
-	insertUserChat = db.UserChats.InsertBuilder()
-	deleteUserChat = db.UserChats.DeleteBuilder()
+	insertUserChat = newQuery(
+		db.UserChats.InsertBuilder(),
+	)
+	getUserChats = newQuery(
+		db.UserChats.SelectBuilder("chat_id"),
+	)
+	deleteUserChat = newQuery(
+		db.UserChats.DeleteBuilder(),
+	)
 )

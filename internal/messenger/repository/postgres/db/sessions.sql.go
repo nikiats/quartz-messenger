@@ -56,8 +56,6 @@ type RefreshSessionParams struct {
 	RefreshTokenHash    string
 }
 
-// выбор действующей сессии для обновления
-// проверка, что пользователь активен
 func (q *Queries) RefreshSession(ctx context.Context, arg RefreshSessionParams) (int64, error) {
 	result, err := q.db.Exec(ctx, refreshSession,
 		arg.NewRefreshTokenHash,

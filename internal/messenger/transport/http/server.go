@@ -567,12 +567,12 @@ func chatResponse(chat domain.Chat) api.Chat {
 		Type:  api.ChatType(chat.Type),
 		Title: &chat.Title,
 	}
-	if chat.Activity.LastMessageID != 0 {
+	if chat.Activity.ID != 0 {
 		response.LastMessage = &api.LastMessage{
-			Id:       snowflake.ID(chat.Activity.LastMessageID),
-			SenderId: chat.Activity.LastMessageSenderID,
-			Preview:  chat.Activity.LastMessagePreview,
-			SentAt:   chat.Activity.LastMessageSentAt,
+			Id:       snowflake.ID(chat.Activity.ID),
+			SenderId: chat.Activity.SenderID,
+			Preview:  chat.Activity.Preview,
+			SentAt:   chat.Activity.SentAt,
 		}
 	}
 	return response
