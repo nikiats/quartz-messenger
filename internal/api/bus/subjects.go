@@ -1,6 +1,10 @@
 package bus
 
-import "github.com/google/uuid"
+import (
+	"strings"
+
+	"github.com/google/uuid"
+)
 
 const QueueMessenger = "messenger"
 
@@ -12,8 +16,20 @@ const (
 	SubjectSessionRevoked = "gateway.session.revoked"
 )
 
-func SubjectGatewayMessage(gatewayID uuid.UUID) string {
-	return "gateway." + gatewayID.String() + ".message"
+func SubjectGatewayUser(gatewayID, userID uuid.UUID) string {
+	return gatewayUsersPrefix(gatewayID) + userID.String()
+}
+
+func SubjectGatewayUsers(gatewayID uuid.UUID) string {
+	return gatewayUsersPrefix(gatewayID) + "*"
+}
+
+func UserFromGatewaySubject(subject string) (uuid.UUID, error) {
+	return uuid.Parse(subject[strings.LastIndexByte(subject, '.')+1:])
+}
+
+func gatewayUsersPrefix(gatewayID uuid.UUID) string {
+	return "gateway." + gatewayID.String() + ".user."
 }
 
 const (

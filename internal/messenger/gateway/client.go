@@ -10,6 +10,7 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"quartz/internal/api/bus"
+	"quartz/internal/api/wsevent"
 	"quartz/internal/common/rediskey"
 	"quartz/internal/messenger/domain"
 )
@@ -25,43 +26,37 @@ func NewClient(nc *nats.Conn, rdb *redis.Client, revokedTTL time.Duration) *Clie
 }
 
 func (c *Client) DeliverMessage(ctx context.Context, recipientIDs []uuid.UUID, message domain.Message) error {
-	pipe := c.rdb.Pipeline()
+	payload, err := json.Marshal(wsevent.ReceiveMessage{
+		Method:    wsevent.MethodReceiveMessage,
+		ChatID:    message.ChatID,
+		MessageID: message.ID,
+		SenderID:  message.SenderID,
+		SentAt:    message.SentAt,
+		Content:   wsevent.MessageContent{Text: message.Content.Text},
+	})
+	if err != nil {
+		return err
+	}
 
-	cmds := make([]*redis.StringSliceCmd, len(recipientIDs))
+	pipe := c.rdb.Pipeline()
+	gateways := make([]*redis.StringSliceCmd, len(recipientIDs))
 	for i, userID := range recipientIDs {
-		cmds[i] = pipe.SMembers(ctx, rediskey.Conn(userID))
+		gateways[i] = pipe.SMembers(ctx, rediskey.Connection(userID))
 	}
 	if _, err := pipe.Exec(ctx); err != nil {
 		return err
 	}
 
-	byGateway := map[string][]uuid.UUID{}
-	for i, cmd := range cmds {
-		for _, gatewayID := range cmd.Val() {
-			byGateway[gatewayID] = append(byGateway[gatewayID], recipientIDs[i])
-		}
-	}
+	for i, userID := range recipientIDs {
+		for _, gateway := range gateways[i].Val() {
+			gatewayID, err := uuid.Parse(gateway)
+			if err != nil {
+				continue
+			}
 
-	for gatewayID, userIDs := range byGateway {
-		id, err := uuid.Parse(gatewayID)
-		if err != nil {
-			continue
-		}
-
-		data, err := json.Marshal(bus.MessageEvent{
-			ChatID:       message.ChatID,
-			MessageID:    message.ID,
-			SenderID:     message.SenderID,
-			Content:      bus.MessageContent(message.Content),
-			SentAt:       message.SentAt,
-			RecipientIDs: userIDs,
-		})
-		if err != nil {
-			return err
-		}
-
-		if err := c.nc.Publish(bus.SubjectGatewayMessage(id), data); err != nil {
-			return err
+			if err := c.nc.Publish(bus.SubjectGatewayUser(gatewayID, userID), payload); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -69,7 +64,7 @@ func (c *Client) DeliverMessage(ctx context.Context, recipientIDs []uuid.UUID, m
 }
 
 func (c *Client) InvalidateSession(ctx context.Context, sessionID uuid.UUID) error {
-	if err := c.rdb.Set(ctx, rediskey.Revoked(sessionID), "1", c.revokedTTL).Err(); err != nil {
+	if err := c.rdb.Set(ctx, rediskey.RevokedSession(sessionID), "1", c.revokedTTL).Err(); err != nil {
 		return err
 	}
 
@@ -79,13 +74,4 @@ func (c *Client) InvalidateSession(ctx context.Context, sessionID uuid.UUID) err
 	}
 
 	return c.nc.Publish(bus.SubjectSessionRevoked, data)
-}
-
-func (c *Client) IsRevoked(ctx context.Context, sessionID uuid.UUID) (bool, error) {
-	n, err := c.rdb.Exists(ctx, rediskey.Revoked(sessionID)).Result()
-	if err != nil {
-		return false, err
-	}
-
-	return n > 0, nil
 }

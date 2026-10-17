@@ -25,7 +25,6 @@ type Chat struct {
 	Activity LastMessage
 }
 
-// разница состоит в том, что контент может быть урезан до превью
 type LastMessage Message
 
 type Role string
