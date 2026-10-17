@@ -22,15 +22,11 @@ type Chat struct {
 	AdminID  uuid.UUID
 	Deleted  bool
 	Version  int32
-	Activity ChatActivity
+	Activity LastMessage
 }
 
-type ChatActivity struct {
-	LastMessageID       int64
-	LastMessageSenderID uuid.UUID
-	LastMessagePreview  string
-	LastMessageSentAt   time.Time
-}
+// разница состоит в том, что контент может быть урезан до превью
+type LastMessage Message
 
 type Role string
 

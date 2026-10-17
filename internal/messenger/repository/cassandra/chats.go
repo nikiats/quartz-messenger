@@ -4,9 +4,10 @@ import (
 	"cmp"
 	"context"
 	"errors"
+	"fmt"
+	"quaztz/internal/common/snowflake"
 	"quaztz/internal/messenger/domain"
 	"quaztz/internal/messenger/repository/cassandra/db"
-	"quaztz/internal/platform/snowflake"
 	"slices"
 
 	"github.com/gocql/gocql"
@@ -17,15 +18,18 @@ import (
 
 func (r *Messenger) GetChat(ctx context.Context, chatID int64, userID uuid.UUID) (domain.Chat, error) {
 	var row db.ChatMembersStruct
-	err := getChat.QueryContext(ctx, r.session).BindMap(qb.M{
-		"chat_id": chatID,
-		"user_id": userID,
-	}).GetRelease(&row)
+	err := getChat.query(ctx, r.session).BindMap(
+		qb.M{
+			"chat_id": chatID,
+			"user_id": userID,
+		},
+	).GetRelease(&row)
+
 	if errors.Is(err, gocql.ErrNotFound) {
 		return domain.Chat{}, domain.ErrChatNotFound
 	}
 	if err != nil {
-		return domain.Chat{}, err
+		return domain.Chat{}, fmt.Errorf("get chat %d: %w", chatID, err)
 	}
 
 	return domain.Chat{
@@ -40,18 +44,23 @@ func (r *Messenger) GetChat(ctx context.Context, chatID int64, userID uuid.UUID)
 	}, nil
 }
 
+// TODO: пагинация, сейчас загружаются все чаты пользователя
 func (r *Messenger) GetChats(ctx context.Context, userID uuid.UUID) ([]domain.Chat, error) {
 	var chatIDs []int64
-	err := getUserChats.QueryContext(ctx, r.session).BindMap(qb.M{
-		"user_id": userID,
-	}).SelectRelease(&chatIDs)
+	err := getUserChats.query(ctx, r.session).BindMap(
+		qb.M{
+			"user_id": userID,
+		},
+	).SelectRelease(&chatIDs)
+
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("get user chats: %w", err)
 	}
 
-	chats := make([]domain.Chat, len(chatIDs))
 	g, ctx := errgroup.WithContext(ctx)
-	g.SetLimit(chatsConcurrency)
+	g.SetLimit(queryConcurrency)
+
+	chats := make([]domain.Chat, len(chatIDs))
 	for i, chatID := range chatIDs {
 		g.Go(func() error {
 			chat, err := r.GetChat(ctx, chatID, userID)
@@ -61,64 +70,98 @@ func (r *Messenger) GetChats(ctx context.Context, userID uuid.UUID) ([]domain.Ch
 			if err != nil {
 				return err
 			}
+			if chat.Deleted {
+				return nil
+			}
 
-			chat.Activity, err = r.GetChatActivity(ctx, chatID)
+			chat.Activity, err = r.GetLastMessage(ctx, chatID)
+			if err != nil {
+				return err
+			}
+
 			chats[i] = chat
-			return err
+
+			return nil
 		})
 	}
-	if err := g.Wait(); err != nil {
+	if err = g.Wait(); err != nil {
 		return nil, err
 	}
 
+	// пропуски в слайсе: пользователь уже не в чате или чат удален
 	chats = slices.DeleteFunc(chats, func(chat domain.Chat) bool {
-		return chat.ID == 0 || chat.Deleted
+		return chat.ID == 0
 	})
+
+	// сортировка по убыванию времени последнего сообщения, для чата без сообщений - времени создания
 	slices.SortFunc(chats, func(a, b domain.Chat) int {
-		return cmp.Compare(max(b.ID, b.Activity.LastMessageID), max(a.ID, a.Activity.LastMessageID))
+		activityA := a.ID
+		if a.Activity.ID != 0 {
+			activityA = a.Activity.ID
+		}
+
+		activityB := b.ID
+		if b.Activity.ID != 0 {
+			activityB = b.Activity.ID
+		}
+
+		return cmp.Compare(activityB, activityA)
 	})
 	return chats, nil
 }
 
-func (r *Messenger) GetChatActivity(ctx context.Context, chatID int64) (domain.ChatActivity, error) {
+func (r *Messenger) GetLastMessage(ctx context.Context, chatID int64) (domain.LastMessage, error) {
 	var row db.ChatActivityStruct
-	err := getChatActivity.QueryContext(ctx, r.session).BindMap(qb.M{
-		"chat_id": chatID,
-	}).GetRelease(&row)
+	err := getChatActivity.query(ctx, r.session).BindMap(
+		qb.M{
+			"chat_id": chatID,
+		},
+	).GetRelease(&row)
+
 	if errors.Is(err, gocql.ErrNotFound) {
-		return domain.ChatActivity{}, nil
+		return domain.LastMessage{}, nil
 	}
 	if err != nil {
-		return domain.ChatActivity{}, err
+		return domain.LastMessage{}, fmt.Errorf("get last message %d: %w", chatID, err)
 	}
 
-	return domain.ChatActivity{
-		LastMessageID:       row.LastMessageId,
-		LastMessageSenderID: row.LastMessageSenderId,
-		LastMessagePreview:  row.LastMessagePreview,
-		LastMessageSentAt:   snowflake.Time(row.LastMessageId),
+	return domain.LastMessage{
+		ID:       row.LastMessageId,
+		SenderID: row.LastMessageSenderId,
+		Content: domain.MessageContent{
+			Text: row.LastMessagePreview,
+		},
+		SentAt: snowflake.Time(row.LastMessageId),
 	}, nil
 }
 
 func (r *Messenger) GetChatMembers(ctx context.Context, chatID int64) ([]domain.Member, error) {
 	var rows []db.ChatMembersStruct
-	err := getChatMembers.QueryContext(ctx, r.session).BindMap(qb.M{
-		"chat_id": chatID,
-	}).SelectRelease(&rows)
+	err := getChatMembers.query(ctx, r.session).BindMap(
+		qb.M{
+			"chat_id": chatID,
+		},
+	).SelectRelease(&rows)
+
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("get chat members %d: %w", chatID, err)
 	}
 
 	members := make([]domain.Member, 0, len(rows))
 	for _, row := range rows {
+		// если нет участников, будут static колонки, а в остальных полях вернет NULL
 		if row.UserId == uuid.Nil {
 			continue
 		}
 
-		role := domain.RoleRegular
-		if row.UserId == row.AdminId {
+		var role domain.Role
+		switch {
+		case row.UserId == row.AdminId:
 			role = domain.RoleAdmin
+		default:
+			role = domain.RoleRegular
 		}
+
 		members = append(members, domain.Member{
 			UserID:   row.UserId,
 			Role:     role,
@@ -129,28 +172,45 @@ func (r *Messenger) GetChatMembers(ctx context.Context, chatID int64) ([]domain.
 }
 
 func (r *Messenger) CreateChat(ctx context.Context, chat domain.Chat, members []domain.Member) error {
-	batch := r.session.ContextBatch(ctx, gocql.LoggedBatch)
-	query := insertChatMember.Query(r.session)
+	batch := r.session.ContextBatch(ctx, gocql.UnloggedBatch)
+
+	err := batch.BindMap(
+		insertChat.query(ctx, r.session),
+		qb.M{
+			"chat_id":  chat.ID,
+			"type":     string(chat.Type),
+			"title":    chat.Title,
+			"user_a":   chat.UserA,
+			"user_b":   chat.UserB,
+			"admin_id": chat.AdminID,
+			"deleted":  false,
+			"version":  chat.Version,
+		},
+	)
+
+	if err != nil {
+		return err
+	}
+
+	query := insertChatMember.query(ctx, r.session)
 	for _, member := range members {
-		err := batch.BindStruct(query, db.ChatMembersStruct{
-			ChatId:   chat.ID,
-			UserId:   member.UserID,
-			JoinedAt: member.JoinedAt,
-			Type:     string(chat.Type),
-			Title:    chat.Title,
-			UserA:    chat.UserA,
-			UserB:    chat.UserB,
-			AdminId:  chat.AdminID,
-			Version:  chat.Version,
-		})
+		err := batch.BindMap(
+			query,
+			qb.M{
+				"chat_id":   chat.ID,
+				"user_id":   member.UserID,
+				"joined_at": member.JoinedAt,
+			},
+		)
+
 		if err != nil {
 			return err
 		}
 	}
 
-	applied, err := r.execBatchCAS(batch)
+	applied, err := r.executeBatch(batch)
 	if err != nil {
-		return err
+		return fmt.Errorf("create chat %d: %w", chat.ID, err)
 	}
 	if !applied {
 		return domain.ErrChatExists
@@ -159,95 +219,142 @@ func (r *Messenger) CreateChat(ctx context.Context, chat domain.Chat, members []
 }
 
 func (r *Messenger) DeleteChat(ctx context.Context, chat domain.Chat) error {
-	chat.Deleted = true
-	return checkVersion(updateChat.QueryContext(ctx, r.session).BindMap(updateChatArgs(chat)).ExecCASRelease())
+	args := updateChatArgs(chat)
+	args["deleted"] = true
+
+	applied, err := updateChat.query(ctx, r.session).BindMap(
+		args,
+	).ExecCASRelease()
+
+	if err != nil {
+		return fmt.Errorf("delete chat %d: %w", chat.ID, err)
+	}
+	return ensureVersion(applied)
 }
 
 func (r *Messenger) CreateChatMember(ctx context.Context, chat domain.Chat, member domain.Member) error {
-	return checkVersion(addChatMember.QueryContext(ctx, r.session).BindMap(qb.M{
-		"chat_id":          chat.ID,
-		"user_id":          member.UserID,
-		"joined_at":        member.JoinedAt,
-		"version":          chat.Version + 1,
-		"expected_version": chat.Version,
-	}).ExecCASRelease())
+	applied, err := addChatMember.query(ctx, r.session).BindMap(
+		qb.M{
+			"chat_id":          chat.ID,
+			"user_id":          member.UserID,
+			"joined_at":        member.JoinedAt,
+			"version":          chat.Version + 1,
+			"expected_version": chat.Version,
+		},
+	).ExecCASRelease()
+
+	if err != nil {
+		return fmt.Errorf("create chat member %d: %w", chat.ID, err)
+	}
+	return ensureVersion(applied)
 }
 
 func (r *Messenger) DeleteChatMember(ctx context.Context, chat domain.Chat, userID uuid.UUID) error {
-	batch := r.session.ContextBatch(ctx, gocql.LoggedBatch)
+	batch := r.session.ContextBatch(ctx, gocql.UnloggedBatch)
 
-	err := batch.BindMap(deleteChatMember.Query(r.session), qb.M{
-		"chat_id": chat.ID,
-		"user_id": userID,
-	})
+	err := batch.BindMap(
+		deleteChatMember.query(ctx, r.session),
+		qb.M{
+			"chat_id": chat.ID,
+			"user_id": userID,
+		},
+	)
+
 	if err != nil {
 		return err
 	}
 
-	err = batch.BindMap(updateChat.Query(r.session), updateChatArgs(chat))
+	err = batch.BindMap(
+		updateChat.query(ctx, r.session),
+		updateChatArgs(chat),
+	)
+
 	if err != nil {
 		return err
 	}
 
-	return checkVersion(r.execBatchCAS(batch))
+	applied, err := r.executeBatch(batch)
+	if err != nil {
+		return fmt.Errorf("delete chat member %d: %w", chat.ID, err)
+	}
+	return ensureVersion(applied)
 }
 
-func (r *Messenger) CreatePrivateChat(ctx context.Context, chat domain.Chat) (int64, error) {
+func (r *Messenger) CreatePrivateChat(ctx context.Context, chat domain.Chat) (int64, bool, error) {
 	row := db.PrivateChatsStruct{
 		UserA:  chat.UserA,
 		UserB:  chat.UserB,
 		ChatId: chat.ID,
 	}
-	_, err := insertPrivateChat.QueryContext(ctx, r.session).BindStruct(row).GetCASRelease(&row)
-	return row.ChatId, err
+
+	// при неудаче в row записывается существующая запись
+	applied, err := insertPrivateChat.query(ctx, r.session).BindStruct(
+		row,
+	).GetCASRelease(&row)
+
+	if err != nil {
+		return 0, false, fmt.Errorf("create private chat %d: %w", chat.ID, err)
+	}
+	return row.ChatId, applied, nil
 }
 
 func (r *Messenger) DeletePrivateChat(ctx context.Context, chat domain.Chat) error {
-	_, err := deletePrivateChat.QueryContext(ctx, r.session).BindStruct(db.PrivateChatsStruct{
-		UserA:  chat.UserA,
-		UserB:  chat.UserB,
-		ChatId: chat.ID,
-	}).ExecCASRelease()
-	return err
+	// неудача означает, что пара уже указывает на другой чат и запись трогать не нужно
+	_, err := deletePrivateChat.query(ctx, r.session).BindStruct(
+		db.PrivateChatsStruct{
+			UserA:  chat.UserA,
+			UserB:  chat.UserB,
+			ChatId: chat.ID,
+		},
+	).ExecCASRelease()
+
+	if err != nil {
+		return fmt.Errorf("delete private chat %d: %w", chat.ID, err)
+	}
+	return nil
 }
 
 func (r *Messenger) CreateUserChats(ctx context.Context, chatID int64, members []domain.Member) error {
-	if len(members) == 0 {
-		return nil
+	g, ctx := errgroup.WithContext(ctx)
+	g.SetLimit(queryConcurrency)
+
+	for _, member := range members {
+		g.Go(func() error {
+			return insertUserChat.query(ctx, r.session).BindStruct(
+				db.UserChatsStruct{
+					UserId:   member.UserID,
+					ChatId:   chatID,
+					JoinedAt: member.JoinedAt,
+				},
+			).ExecRelease()
+		})
 	}
 
-	batch := r.session.ContextBatch(ctx, gocql.UnloggedBatch)
-	query := insertUserChat.Query(r.session)
-	for _, member := range members {
-		err := batch.BindStruct(query, db.UserChatsStruct{
-			UserId:   member.UserID,
-			ChatId:   chatID,
-			JoinedAt: member.JoinedAt,
-		})
-		if err != nil {
-			return err
-		}
+	if err := g.Wait(); err != nil {
+		return fmt.Errorf("create user chats %d: %w", chatID, err)
 	}
-	return r.session.ExecuteBatch(batch)
+	return nil
 }
 
 func (r *Messenger) DeleteUserChats(ctx context.Context, chatID int64, userIDs []uuid.UUID) error {
-	if len(userIDs) == 0 {
-		return nil
+	g, ctx := errgroup.WithContext(ctx)
+	g.SetLimit(queryConcurrency)
+
+	for _, userID := range userIDs {
+		g.Go(func() error {
+			return deleteUserChat.query(ctx, r.session).BindMap(
+				qb.M{
+					"user_id": userID,
+					"chat_id": chatID,
+				},
+			).ExecRelease()
+		})
 	}
 
-	batch := r.session.ContextBatch(ctx, gocql.UnloggedBatch)
-	query := deleteUserChat.Query(r.session)
-	for _, userID := range userIDs {
-		err := batch.BindMap(query, qb.M{
-			"user_id": userID,
-			"chat_id": chatID,
-		})
-		if err != nil {
-			return err
-		}
+	if err := g.Wait(); err != nil {
+		return fmt.Errorf("delete user chats %d: %w", chatID, err)
 	}
-	return r.session.ExecuteBatch(batch)
+	return nil
 }
 
 func updateChatArgs(chat domain.Chat) qb.M {

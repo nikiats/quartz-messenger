@@ -35,17 +35,17 @@ func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) er
 }
 
 const refreshSession = `-- name: RefreshSession :execrows
-UPDATE sessions s
-   SET refresh_token_hash = $1,
-       expires_at         = $2
-  FROM users u
- WHERE s.user_id = $3
-   AND s.id = $4
-   AND s.refresh_token_hash = $5
-   AND s.revoked_at IS NULL
-   AND s.expires_at > now()
-   AND u.id = $3
-   AND NOT u.suspended
+UPDATE sessions
+SET
+refresh_token_hash = $1,
+expires_at = $2
+WHERE
+user_id = $3
+AND sessions.id = $4
+AND refresh_token_hash = $5
+AND revoked_at IS NULL
+AND expires_at > now()
+AND EXISTS (SELECT 1 FROM users u WHERE u.id = $3 AND NOT u.suspended)
 `
 
 type RefreshSessionParams struct {
@@ -72,10 +72,10 @@ func (q *Queries) RefreshSession(ctx context.Context, arg RefreshSessionParams) 
 
 const revokeSession = `-- name: RevokeSession :execrows
 UPDATE sessions
-   SET revoked_at = now()
- WHERE user_id = $1
-   AND id = $2
-   AND revoked_at IS NULL
+SET revoked_at = now()
+WHERE user_id = $1
+AND id = $2
+AND revoked_at IS NULL
 `
 
 type RevokeSessionParams struct {

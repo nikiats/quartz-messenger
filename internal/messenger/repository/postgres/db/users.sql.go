@@ -13,9 +13,9 @@ import (
 
 const countActiveUsers = `-- name: CountActiveUsers :one
 SELECT count(*)
-  FROM users
- WHERE id = ANY($1::uuid[])
-   AND NOT suspended
+FROM users
+WHERE id = ANY($1::uuid[])
+AND NOT suspended
 `
 
 func (q *Queries) CountActiveUsers(ctx context.Context, ids []uuid.UUID) (int64, error) {
@@ -23,21 +23,6 @@ func (q *Queries) CountActiveUsers(ctx context.Context, ids []uuid.UUID) (int64,
 	var count int64
 	err := row.Scan(&count)
 	return count, err
-}
-
-const createLogin = `-- name: CreateLogin :exec
-INSERT INTO user_logins (login, user_id)
-VALUES ($1, $2)
-`
-
-type CreateLoginParams struct {
-	Login  string
-	UserID uuid.UUID
-}
-
-func (q *Queries) CreateLogin(ctx context.Context, arg CreateLoginParams) error {
-	_, err := q.db.Exec(ctx, createLogin, arg.Login, arg.UserID)
-	return err
 }
 
 const createUser = `-- name: CreateUser :exec
@@ -56,39 +41,14 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) error {
 	return err
 }
 
-const createUsername = `-- name: CreateUsername :exec
-INSERT INTO usernames (username, user_id)
-VALUES ($1, $2)
-`
-
-type CreateUsernameParams struct {
-	Username string
-	UserID   uuid.UUID
-}
-
-func (q *Queries) CreateUsername(ctx context.Context, arg CreateUsernameParams) error {
-	_, err := q.db.Exec(ctx, createUsername, arg.Username, arg.UserID)
-	return err
-}
-
-const deleteUsername = `-- name: DeleteUsername :exec
-DELETE FROM usernames
- WHERE username = $1
-`
-
-func (q *Queries) DeleteUsername(ctx context.Context, username string) error {
-	_, err := q.db.Exec(ctx, deleteUsername, username)
-	return err
-}
-
 const getCredentials = `-- name: GetCredentials :one
-SELECT id, password_hash, suspended
-  FROM users
- WHERE id = (SELECT l.user_id FROM user_logins l WHERE l.login = $1)
+SELECT id AS user_id, password_hash, suspended
+FROM users
+WHERE login = $1
 `
 
 type GetCredentialsRow struct {
-	ID           uuid.UUID
+	UserID       uuid.UUID
 	PasswordHash string
 	Suspended    bool
 }
@@ -96,19 +56,19 @@ type GetCredentialsRow struct {
 func (q *Queries) GetCredentials(ctx context.Context, login string) (GetCredentialsRow, error) {
 	row := q.db.QueryRow(ctx, getCredentials, login)
 	var i GetCredentialsRow
-	err := row.Scan(&i.ID, &i.PasswordHash, &i.Suspended)
+	err := row.Scan(&i.UserID, &i.PasswordHash, &i.Suspended)
 	return i, err
 }
 
 const getUser = `-- name: GetUser :one
-SELECT id, username, visible_name
-  FROM users
- WHERE id = $1
+SELECT id, COALESCE(username, '')::text AS username, visible_name
+FROM users
+WHERE id = $1
 `
 
 type GetUserRow struct {
 	ID          uuid.UUID
-	Username    *string
+	Username    string
 	VisibleName string
 }
 
@@ -121,8 +81,8 @@ func (q *Queries) GetUser(ctx context.Context, id uuid.UUID) (GetUserRow, error)
 
 const getVisibleNames = `-- name: GetVisibleNames :many
 SELECT id, visible_name
-  FROM users
- WHERE id = ANY($1::uuid[])
+FROM users
+WHERE id = ANY($1::uuid[])
 `
 
 type GetVisibleNamesRow struct {
@@ -151,9 +111,7 @@ func (q *Queries) GetVisibleNames(ctx context.Context, ids []uuid.UUID) ([]GetVi
 }
 
 const isActiveUser = `-- name: IsActiveUser :one
-SELECT EXISTS (
-    SELECT 1 FROM users WHERE id = $1 AND NOT suspended
-)
+SELECT EXISTS (SELECT 1 FROM users WHERE id = $1 AND NOT suspended)
 `
 
 func (q *Queries) IsActiveUser(ctx context.Context, id uuid.UUID) (bool, error) {
@@ -163,27 +121,13 @@ func (q *Queries) IsActiveUser(ctx context.Context, id uuid.UUID) (bool, error) 
 	return exists, err
 }
 
-const lockUsername = `-- name: LockUsername :one
-SELECT username
-  FROM users
- WHERE id = $1
-   FOR UPDATE
-`
-
-func (q *Queries) LockUsername(ctx context.Context, id uuid.UUID) (*string, error) {
-	row := q.db.QueryRow(ctx, lockUsername, id)
-	var username *string
-	err := row.Scan(&username)
-	return username, err
-}
-
 const searchUsers = `-- name: SearchUsers :many
-SELECT id, username, visible_name
-  FROM users
- WHERE starts_with(lower(username), lower($1::text))
-   AND NOT suspended
- ORDER BY username
- LIMIT $2
+SELECT id, COALESCE(username, '')::text AS username, visible_name
+FROM users
+WHERE starts_with(lower(username), lower($1::text))
+AND NOT suspended
+ORDER BY username
+LIMIT $2
 `
 
 type SearchUsersParams struct {
@@ -193,7 +137,7 @@ type SearchUsersParams struct {
 
 type SearchUsersRow struct {
 	ID          uuid.UUID
-	Username    *string
+	Username    string
 	VisibleName string
 }
 
@@ -219,9 +163,10 @@ func (q *Queries) SearchUsers(ctx context.Context, arg SearchUsersParams) ([]Sea
 
 const updateProfile = `-- name: UpdateProfile :exec
 UPDATE users
-   SET visible_name = COALESCE($1, visible_name),
-       username     = COALESCE($2, username)
- WHERE id = $3
+SET
+visible_name = COALESCE($1, visible_name),
+username = COALESCE($2, username)
+WHERE id = $3
 `
 
 type UpdateProfileParams struct {
