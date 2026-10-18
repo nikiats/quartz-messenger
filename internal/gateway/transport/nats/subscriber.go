@@ -25,7 +25,7 @@ func (s *Subscriber) Start(gatewayID uuid.UUID) error {
 		return err
 	}
 
-	_, err := s.nc.Subscribe(bus.SubjectGatewayUsers(gatewayID), s.handleUserEvent)
+	_, err := s.nc.Subscribe(bus.SubjectGatewayDeliver(gatewayID), s.handleDeliver)
 	return err
 }
 
@@ -39,12 +39,14 @@ func (s *Subscriber) handleSessionRevoked(msg *nats.Msg) {
 	s.hub.CloseSession(event.SessionID)
 }
 
-func (s *Subscriber) handleUserEvent(msg *nats.Msg) {
-	userID, err := bus.UserFromGatewaySubject(msg.Subject)
-	if err != nil {
-		slog.Warn("invalid user event subject", "subject", msg.Subject, "error", err)
-		return
-	}
+func (s *Subscriber) handleDeliver(msg *nats.Msg) {
+	for _, recipient := range msg.Header.Values(bus.HeaderRecipient) {
+		userID, err := uuid.Parse(recipient)
+		if err != nil {
+			slog.Warn("invalid recipient", "recipient", recipient, "error", err)
+			continue
+		}
 
-	s.hub.Deliver(userID, msg.Data)
+		s.hub.Deliver(userID, msg.Data)
+	}
 }

@@ -10,53 +10,60 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"quartz/internal/api/bus"
-	"quartz/internal/api/wsevent"
 	"quartz/internal/common/rediskey"
-	"quartz/internal/messenger/domain"
 )
 
 type Client struct {
 	nc         *nats.Conn
-	rdb        *redis.Client
+	r          *redis.Client
 	revokedTTL time.Duration
 }
 
-func NewClient(nc *nats.Conn, rdb *redis.Client, revokedTTL time.Duration) *Client {
-	return &Client{nc: nc, rdb: rdb, revokedTTL: revokedTTL}
+func NewClient(natsConn *nats.Conn, redis *redis.Client, revokedTTL time.Duration) *Client {
+	return &Client{
+		nc:         natsConn,
+		r:          redis,
+		revokedTTL: revokedTTL,
+	}
 }
 
-func (c *Client) DeliverMessage(ctx context.Context, recipientIDs []uuid.UUID, message domain.Message) error {
-	payload, err := json.Marshal(wsevent.ReceiveMessage{
-		Method:    wsevent.MethodReceiveMessage,
-		ChatID:    message.ChatID,
-		MessageID: message.ID,
-		SenderID:  message.SenderID,
-		SentAt:    message.SentAt,
-		Content:   wsevent.MessageContent{Text: message.Content.Text},
-	})
+func (c *Client) dispatch(ctx context.Context, recipientIDs []uuid.UUID, event any) error {
+	payload, err := json.Marshal(event)
 	if err != nil {
 		return err
 	}
 
-	pipe := c.rdb.Pipeline()
-	gateways := make([]*redis.StringSliceCmd, len(recipientIDs))
+	pipe := c.r.Pipeline()
+	userGateways := make([]*redis.StringSliceCmd, len(recipientIDs))
 	for i, userID := range recipientIDs {
-		gateways[i] = pipe.SMembers(ctx, rediskey.Connection(userID))
+		userGateways[i] = pipe.SMembers(ctx, rediskey.Connection(userID))
 	}
 	if _, err := pipe.Exec(ctx); err != nil {
 		return err
 	}
 
+	gatewayUsers := make(map[string][]uuid.UUID)
 	for i, userID := range recipientIDs {
-		for _, gateway := range gateways[i].Val() {
-			gatewayID, err := uuid.Parse(gateway)
-			if err != nil {
-				continue
-			}
+		for _, gateway := range userGateways[i].Val() {
+			gatewayUsers[gateway] = append(gatewayUsers[gateway], userID)
+		}
+	}
 
-			if err := c.nc.Publish(bus.SubjectGatewayUser(gatewayID, userID), payload); err != nil {
-				return err
-			}
+	for gateway, userIDs := range gatewayUsers {
+		gatewayID, err := uuid.Parse(gateway)
+		if err != nil {
+			continue
+		}
+
+		subject := bus.SubjectGatewayDeliver(gatewayID)
+		msg := nats.NewMsg(subject)
+		msg.Data = payload
+		for _, userID := range userIDs {
+			msg.Header.Add(bus.HeaderRecipient, userID.String())
+		}
+
+		if err := c.nc.PublishMsg(msg); err != nil {
+			return err
 		}
 	}
 
@@ -64,7 +71,7 @@ func (c *Client) DeliverMessage(ctx context.Context, recipientIDs []uuid.UUID, m
 }
 
 func (c *Client) InvalidateSession(ctx context.Context, sessionID uuid.UUID) error {
-	if err := c.rdb.Set(ctx, rediskey.RevokedSession(sessionID), "1", c.revokedTTL).Err(); err != nil {
+	if err := c.r.Set(ctx, rediskey.RevokedSession(sessionID), "1", c.revokedTTL).Err(); err != nil {
 		return err
 	}
 
