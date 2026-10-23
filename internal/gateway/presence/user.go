@@ -23,7 +23,12 @@ func New(rdb *redis.Client, gatewayID uuid.UUID) *Presence {
 }
 
 func (p *Presence) Register(ctx context.Context, userID uuid.UUID) error {
-	err := p.rdb.SAdd(ctx, rediskey.Connection(userID), p.gatewayID.String()).Err()
+	err := p.rdb.SAdd(ctx, rediskey.GatewayUsers(p.gatewayID), userID.String()).Err()
+	if err != nil {
+		return fmt.Errorf("register user %s for gateway %s: %w", userID, p.gatewayID, err)
+	}
+
+	err = p.rdb.SAdd(ctx, rediskey.UserGateways(userID), p.gatewayID.String()).Err()
 	if err != nil {
 		return fmt.Errorf("register presence of user %s: %w", userID, err)
 	}
@@ -32,9 +37,14 @@ func (p *Presence) Register(ctx context.Context, userID uuid.UUID) error {
 }
 
 func (p *Presence) Unregister(ctx context.Context, userID uuid.UUID) error {
-	err := p.rdb.SRem(ctx, rediskey.Connection(userID), p.gatewayID.String()).Err()
+	err := p.rdb.SRem(ctx, rediskey.UserGateways(userID), p.gatewayID.String()).Err()
 	if err != nil {
 		return fmt.Errorf("unregister presence of user %s: %w", userID, err)
+	}
+
+	err = p.rdb.SRem(ctx, rediskey.GatewayUsers(p.gatewayID), userID.String()).Err()
+	if err != nil {
+		return fmt.Errorf("unregister user %s for gateway %s: %w", userID, p.gatewayID, err)
 	}
 
 	return nil

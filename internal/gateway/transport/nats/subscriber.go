@@ -17,7 +17,10 @@ type Subscriber struct {
 }
 
 func NewSubscriber(nc *nats.Conn, hub *usecase.Hub) *Subscriber {
-	return &Subscriber{nc: nc, hub: hub}
+	return &Subscriber{
+		nc:  nc,
+		hub: hub,
+	}
 }
 
 func (s *Subscriber) Start(gatewayID uuid.UUID) error {

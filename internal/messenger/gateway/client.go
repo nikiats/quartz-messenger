@@ -37,7 +37,7 @@ func (c *Client) dispatch(ctx context.Context, recipientIDs []uuid.UUID, event w
 	pipe := c.r.Pipeline()
 	userGateways := make([]*redis.StringSliceCmd, len(recipientIDs))
 	for i, userID := range recipientIDs {
-		userGateways[i] = pipe.SMembers(ctx, rediskey.Connection(userID))
+		userGateways[i] = pipe.SMembers(ctx, rediskey.UserGateways(userID))
 	}
 	if _, err := pipe.Exec(ctx); err != nil {
 		return err
