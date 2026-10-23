@@ -10,14 +10,15 @@ import (
 )
 
 func (c *Client) DeliverMessage(ctx context.Context, recipientIDs []uuid.UUID, message domain.Message) error {
-	return c.dispatch(ctx, recipientIDs, wsevent.ReceiveMessage{
-		Method:    wsevent.MethodReceiveMessage,
-		ChatID:    message.ChatID,
-		MessageID: message.ID,
-		SenderID:  message.SenderID,
-		SentAt:    message.SentAt,
-		Content: wsevent.MessageContent{
-			Text: message.Content.Text,
-		},
-	})
+	return c.dispatch(
+		ctx,
+		recipientIDs,
+		wsevent.NewReceiveMessage(
+			message.ChatID,
+			message.ID,
+			message.SenderID,
+			message.SentAt,
+			message.Content.Text,
+		),
+	)
 }

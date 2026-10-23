@@ -10,6 +10,7 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"quartz/internal/api/bus"
+	"quartz/internal/api/wsevent"
 	"quartz/internal/common/rediskey"
 )
 
@@ -27,7 +28,7 @@ func NewClient(natsConn *nats.Conn, redis *redis.Client, revokedTTL time.Duratio
 	}
 }
 
-func (c *Client) dispatch(ctx context.Context, recipientIDs []uuid.UUID, event any) error {
+func (c *Client) dispatch(ctx context.Context, recipientIDs []uuid.UUID, event wsevent.WSEvent) error {
 	payload, err := json.Marshal(event)
 	if err != nil {
 		return err
